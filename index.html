@@ -40,7 +40,6 @@
     .loading-hourglass {
       display: inline-block;
       animation: spinHourglass 1.8s infinite ease-in-out;
-      margin-right: 6px;
       vertical-align: middle;
     }
 
@@ -145,7 +144,6 @@
       margin-bottom: 12px;
     }
 
-    /* 下拉選單平時清空文字（點擊時才顯示內容） */
     .lesson-select-blank {
       color: transparent !important;
     }
@@ -224,6 +222,20 @@
       padding: 3px 8px;
       border-radius: 6px;
       margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* 控制按鈕：一行三格排版 */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .controls-grid .btn {
+      padding: 10px 4px;
+      font-size: 0.88rem;
       white-space: nowrap;
     }
 
@@ -344,7 +356,6 @@
     .voice-manage-name { font-size: 0.9rem; font-weight: 600; }
     .voice-manage-status { font-size: 0.76rem; color: var(--text-sub); margin-top: 2px; }
 
-    /* 語音挑選項目專用樣式 */
     .voice-pick-item {
       display: flex;
       justify-content: space-between;
@@ -427,7 +438,6 @@
       transition: width 0.25s ease;
     }
 
-    /* 彈窗置頂標題列與捲動主體 (標題與✕永不滾動消失) */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -532,7 +542,6 @@
           <button type="button" class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem;" onclick="clearSelectedImage()">✕ 移除</button>
         </div>
 
-        <!-- 句子分拆模型改放此處 -->
         <label>句子分拆模型:</label>
         <select id="addGeminiModelSelect" style="margin-bottom:12px;"></select>
 
@@ -555,14 +564,13 @@
                 onblur="updateLessonDropdownBlankState()"></select>
 
         <button class="icon-btn" onclick="switchView('ADD')" title="加入課文">➕</button>
-        <button class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
+        <button id="btnManageLesson" class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
       </div>
 
       <div class="player-status-row">
         <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
         
         <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-          <!-- 點擊語音標籤可直接切換此課文已下載的語音 -->
           <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 載入中</span>
           <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.1rem; display:none;" onclick="toggleMaskWithEye()">
             👁️
@@ -570,13 +578,18 @@
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
-        <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 開始讀默</button>
+      <!-- 第一行控制鍵：播放/繼續 ｜ 暫停 ｜ 由頭播放 -->
+      <div class="controls-grid">
+        <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 播放</button>
         <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
+        <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 由頭播放</button>
       </div>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:12px;">
-        <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播此句</button>
-        <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 重頭開始</button>
+
+      <!-- 第二行控制鍵：上一句 ｜ 重播 ｜ 下一句 -->
+      <div class="controls-grid">
+        <button id="btnPrev" class="btn btn-outline" onclick="handlePrevChunk()" disabled>⏮ 上一句</button>
+        <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播</button>
+        <button id="btnNext" class="btn btn-outline" onclick="handleNextChunk()" disabled>⏭ 下一句</button>
       </div>
 
       <audio id="mainAudio" playsinline controls style="width:100%; margin-bottom:8px;"></audio>
@@ -585,7 +598,7 @@
 
   </main>
 
-  <!-- 彈窗 1：選擇課文語音 (點擊 currentVoiceBadge 彈出) -->
+  <!-- 彈窗 1：選擇課文語音 -->
   <div id="voicePickerModal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
@@ -596,7 +609,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 2：課文管理 Modal (標題與✕按鈕置頂) -->
+  <!-- 彈窗 2：課文管理 Modal -->
   <div id="manageLessonModal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
@@ -605,14 +618,21 @@
       </div>
       <div class="modal-body">
         <label>課文標題:</label>
-        <div style="display:flex; gap:8px; margin-bottom:14px;">
-          <input type="text" id="manageTitleInput" placeholder="課文標題">
-          <button class="btn btn-outline" style="padding:10px 14px; white-space:nowrap;" onclick="saveLessonTitle()">儲存標題</button>
+        
+        <!-- 標題純文字展示區 -->
+        <div id="titleViewMode" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;">
+          <span id="manageTitleText" style="font-weight:700; font-size:0.98rem; word-break:break-all;"></span>
+          <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem;" onclick="enableTitleEdit()">✏️ 修改</button>
         </div>
 
-        <label>未下載語音:</label>
-        <div id="voicePendingListContainer" style="margin-bottom:12px;"></div>
+        <!-- 點擊修改後轉為輸入框 -->
+        <div id="titleEditMode" style="display:none; gap:6px; margin-bottom:12px; align-items:center;">
+          <input type="text" id="manageTitleInput" style="flex:1;">
+          <button class="btn btn-primary" style="padding:10px 12px; font-size:0.85rem;" onclick="saveLessonTitle()">儲存</button>
+          <button class="btn btn-outline" style="padding:10px 12px; font-size:0.85rem;" onclick="cancelTitleEdit()">取消</button>
+        </div>
 
+        <!-- 下載進度條 (位於標題下方、未下載列表上方) -->
         <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
           <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
           <div class="progress-bar-bg" style="margin:0 0 4px 0;">
@@ -620,6 +640,14 @@
           </div>
         </div>
 
+        <!-- 未下載語音列表與一鍵下載全部按鈕 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0 6px;">
+          <label style="margin:0;">未下載語音:</label>
+          <button id="btnDownloadAllVoices" class="btn btn-primary" style="padding:5px 10px; font-size:0.8rem;" onclick="downloadAllPendingVoices()">📥 一鍵下載全部</button>
+        </div>
+        <div id="voicePendingListContainer" style="margin-bottom:14px;"></div>
+
+        <!-- 已下載語音列表 (排在進度條與未下載列表之後) -->
         <label>已下載語音:</label>
         <div id="voiceDownloadedListContainer" style="margin-bottom:16px;"></div>
 
@@ -630,7 +658,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 3：API Key 設定 Modal (標題與✕按鈕置頂) -->
+  <!-- 彈窗 3：API Key 設定 Modal -->
   <div id="keyModal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
@@ -646,7 +674,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 4：系統設定 Modal (標題與✕按鈕置頂，已移除語音選單) -->
+  <!-- 彈窗 4：系統設定 Modal -->
   <div id="settingsModal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
@@ -864,6 +892,17 @@
       }
     }
 
+    // 控制「管理課文」圖示在下載時變為旋轉漏斗 ⏳
+    function setManageButtonLoading(loading) {
+      const btn = document.getElementById('btnManageLesson');
+      if (!btn) return;
+      if (loading) {
+        btn.innerHTML = `<span class="loading-hourglass">⏳</span>`;
+      } else {
+        btn.innerHTML = `📋`;
+      }
+    }
+
     /**
      * ========================================================================
      * 課文專屬語音選擇 Modal
@@ -917,17 +956,15 @@
       currentLesson.selectedVoice = voiceId;
       updateVoiceBadge();
 
-      // 即時重新載入該語音模型的音檔
       await reloadAudioForCurrentLesson();
 
-      // 背景即時同步寫入該課文的 lesson.json (GitHub & Drive)
       callGAS('setLessonVoice', {
         payload: {
           folderName: currentLesson.folderName,
           voiceName: voiceId,
           ghConfig: APP_CONFIG.GITHUB
         }
-      }).catch(err => console.error("同步課文語音設定失敗:", err));
+      }).catch(err => console.error("同步語音失敗:", err));
     }
 
     /**
@@ -1096,9 +1133,27 @@
      */
     function openLessonManageModal() {
       if (!currentLesson) return;
-      document.getElementById('manageTitleInput').value = currentLesson.title;
+      cancelTitleEdit();
+      document.getElementById('manageTitleText').innerText = currentLesson.title;
       renderVoiceManageList();
       openModal('manageLessonModal');
+    }
+
+    function enableTitleEdit() {
+      document.getElementById('titleViewMode').style.display = 'none';
+      const editBox = document.getElementById('titleEditMode');
+      editBox.style.display = 'flex';
+      const input = document.getElementById('manageTitleInput');
+      input.value = currentLesson.title;
+      input.focus();
+    }
+
+    function cancelTitleEdit() {
+      document.getElementById('titleEditMode').style.display = 'none';
+      document.getElementById('titleViewMode').style.display = 'flex';
+      if (currentLesson) {
+        document.getElementById('manageTitleText').innerText = currentLesson.title;
+      }
     }
 
     function renderVoiceManageList() {
@@ -1140,8 +1195,14 @@
         }
       });
 
-      pendingContainer.innerHTML = pendingHtml.length > 0 ? pendingHtml.join('') : '<div style="color:var(--text-sub); font-size:0.85rem; padding:4px 0;">所有語音模型均已下載</div>';
-      downloadedContainer.innerHTML = downloadedHtml.length > 0 ? downloadedHtml.join('') : '<div style="color:var(--text-sub); font-size:0.85rem; padding:4px 0;">尚未下載任何語音模型</div>';
+      pendingContainer.innerHTML = pendingHtml.length > 0 ? pendingHtml.join('') : '<div style="color:var(--text-sub); font-size:0.85rem; padding:4px 0;">所有語音均已下載</div>';
+      downloadedContainer.innerHTML = downloadedHtml.length > 0 ? downloadedHtml.join('') : '<div style="color:var(--text-sub); font-size:0.85rem; padding:4px 0;">尚未下載任何語音</div>';
+
+      const btnAll = document.getElementById('btnDownloadAllVoices');
+      if (btnAll) {
+        btnAll.style.display = (pendingHtml.length > 0) ? 'inline-flex' : 'none';
+        btnAll.disabled = isVoiceDownloading;
+      }
     }
 
     async function saveLessonTitle() {
@@ -1163,6 +1224,7 @@
         lessonsIndex = data.indexList;
         renderCatalogDropdown();
         renderChunks();
+        cancelTitleEdit();
         progBox.style.display = 'none';
         alert("✅ 標題已修改");
       } catch (e) {
@@ -1171,11 +1233,8 @@
       }
     }
 
-    async function downloadSingleVoice(voiceId) {
-      if (!currentLesson || isVoiceDownloading) return;
-      isVoiceDownloading = true;
-      renderVoiceManageList();
-
+    // 核心單一語音下載函數
+    async function executeVoiceDownload(voiceId) {
       const progBox = document.getElementById('voiceDownloadProgressBox');
       const progText = document.getElementById('voiceProgText');
       const progBar = document.getElementById('voiceProgBarFill');
@@ -1187,54 +1246,92 @@
       const allVoiceBlobs = [];
       const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
 
-      try {
-        for (let i = 0; i < total; i += batchSize) {
-          const batch = chunks.slice(i, i + batchSize);
-          const startNum = i + 1;
-          const endNum = Math.min(total, i + batchSize);
-          const pct = Math.round((i / total) * 100);
+      for (let i = 0; i < total; i += batchSize) {
+        const batch = chunks.slice(i, i + batchSize);
+        const startNum = i + 1;
+        const endNum = Math.min(total, i + batchSize);
+        const pct = Math.round((i / total) * 100);
 
-          progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在下載 ${getShortVoiceName(voiceId)} ${startNum}~${endNum}/${total}...`;
-          progBar.style.width = pct + '%';
+        progText.innerHTML = `<span class="loading-hourglass">⏳</span> 下載 ${getShortVoiceName(voiceId)} ${startNum}~${endNum}/${total}...`;
+        progBar.style.width = pct + '%';
 
-          const res = await callGAS('step2_downloadVoiceBatch', {
-            payload: {
-              folderName: targetFolder,
-              voiceName: voiceId,
-              batchChunks: batch,
-              ghConfig: APP_CONFIG.GITHUB
-            }
-          });
-
-          allVoiceBlobs.push(...res.blobResults);
-        }
-
-        progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在同步 ${getShortVoiceName(voiceId)}...`;
-        progBar.style.width = '95%';
-
-        const commitRes = await callGAS('step3_commitVoiceBlobs', {
+        const res = await callGAS('step2_downloadVoiceBatch', {
           payload: {
             folderName: targetFolder,
             voiceName: voiceId,
-            allVoiceBlobs: allVoiceBlobs,
+            batchChunks: batch,
             ghConfig: APP_CONFIG.GITHUB
           }
         });
 
-        progBar.style.width = '100%';
-        currentLesson = commitRes.lesson;
-        lessonsIndex = commitRes.indexList;
+        allVoiceBlobs.push(...res.blobResults);
+      }
 
-        // 若切換為剛下載的語音，立即刷新音檔
-        if (currentLesson.selectedVoice === voiceId) {
-          await reloadAudioForCurrentLesson();
+      progText.innerHTML = `<span class="loading-hourglass">⏳</span> 同步 ${getShortVoiceName(voiceId)}...`;
+      progBar.style.width = '95%';
+
+      const commitRes = await callGAS('step3_commitVoiceBlobs', {
+        payload: {
+          folderName: targetFolder,
+          voiceName: voiceId,
+          allVoiceBlobs: allVoiceBlobs,
+          ghConfig: APP_CONFIG.GITHUB
         }
+      });
 
+      progBar.style.width = '100%';
+      currentLesson = commitRes.lesson;
+      lessonsIndex = commitRes.indexList;
+
+      if (currentLesson.selectedVoice === voiceId) {
+        await reloadAudioForCurrentLesson();
+      }
+    }
+
+    // 單一語音下載入口
+    async function downloadSingleVoice(voiceId) {
+      if (!currentLesson || isVoiceDownloading) return;
+      isVoiceDownloading = true;
+      setManageButtonLoading(true);
+      renderVoiceManageList();
+
+      try {
+        await executeVoiceDownload(voiceId);
       } catch (err) {
         alert(`語音下載中斷: ` + err.message);
       } finally {
         isVoiceDownloading = false;
-        progBox.style.display = 'none';
+        setManageButtonLoading(false);
+        document.getElementById('voiceDownloadProgressBox').style.display = 'none';
+        renderVoiceManageList();
+        updateVoiceBadge();
+      }
+    }
+
+    // 一鍵下載全部未下載語音
+    async function downloadAllPendingVoices() {
+      if (!currentLesson || isVoiceDownloading) return;
+      const voicesMap = currentLesson.voices || {};
+      const pendingVoiceIds = APP_CONFIG.TTS_VOICES.map(v => v.id).filter(id => !(voicesMap[id] && voicesMap[id].downloaded));
+      if (pendingVoiceIds.length === 0) return;
+
+      isVoiceDownloading = true;
+      setManageButtonLoading(true);
+      renderVoiceManageList();
+
+      try {
+        for (let idx = 0; idx < pendingVoiceIds.length; idx++) {
+          const vid = pendingVoiceIds[idx];
+          await executeVoiceDownload(vid);
+          renderVoiceManageList();
+        }
+        alert("✅ 所有語音已下載完成");
+      } catch (err) {
+        alert("下載中斷: " + err.message);
+      } finally {
+        isVoiceDownloading = false;
+        setManageButtonLoading(false);
+        document.getElementById('voiceDownloadProgressBox').style.display = 'none';
         renderVoiceManageList();
         updateVoiceBadge();
       }
@@ -1300,7 +1397,6 @@
         currentLesson = await res.json();
         currentLesson.folderName = folderName;
 
-        // 確認該課文綁定的語音模型
         const downloadedVoices = Object.keys(currentLesson.voices || {}).filter(k => currentLesson.voices[k].downloaded);
         if (!currentLesson.selectedVoice && downloadedVoices.length > 0) {
           currentLesson.selectedVoice = downloadedVoices[0];
@@ -1309,8 +1405,9 @@
         renderCatalogDropdown();
         renderChunks();
         updateVoiceBadge();
+        updateNavButtonsState();
 
-        // 載入到課文內容立即隱藏「連線中...」遮罩
+        // 載入到課文內容立即隱藏「連線中...」遮罩！
         document.getElementById('globalLoadingCard').style.display = 'none';
 
         await reloadAudioForCurrentLesson();
@@ -1367,6 +1464,7 @@
       document.getElementById('btnPlay').disabled = false;
       document.getElementById('btnRestart').disabled = false;
       document.getElementById('btnReplay').disabled = false;
+      updateNavButtonsState();
     }
 
     function renderChunks() {
@@ -1394,13 +1492,13 @@
       }).join('');
     }
 
+    // 點擊卡片：直接播放此句、變 active，但不自動播放下一句！
     function onChunkCardClicked(idx) {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
 
-      if (dictation.isRunning) {
-        pauseDictation();
-      }
+      // 停止連續讀默計時，重設播放按鈕為「播放」
+      stopDictation();
 
       selectedActiveIdx = idx;
       dictation.chunkIdx = idx;
@@ -1408,10 +1506,47 @@
 
       renderChunks();
       scrollChunkIntoView(idx);
+      updateNavButtonsState();
 
       const chunk = currentLesson.chunks[idx];
       const label = chunk.isTitle ? "課題" : `第 ${chunk.index} 句`;
-      document.getElementById('playerBanner').innerText = `已選定：${label}`;
+      document.getElementById('playerBanner').innerText = `🔊 朗讀：${label}`;
+
+      // 單句播放音檔，播畢留在該句，不跳下一句
+      const player = document.getElementById('mainAudio');
+      if (audioBlobUrls[idx]) {
+        player.src = audioBlobUrls[idx];
+        player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
+        player.onended = () => {
+          document.getElementById('playerBanner').innerText = `已選定：${label}`;
+        };
+        player.play().catch(() => {});
+      }
+    }
+
+    // 上一句按鈕
+    function handlePrevChunk() {
+      if (!currentLesson || selectedActiveIdx <= 0) return;
+      onChunkCardClicked(selectedActiveIdx - 1);
+    }
+
+    // 下一句按鈕
+    function handleNextChunk() {
+      if (!currentLesson) return;
+      const total = currentLesson.chunks.length;
+      if (selectedActiveIdx >= total - 1) return;
+      const nextIdx = (selectedActiveIdx < 0) ? 0 : (selectedActiveIdx + 1);
+      onChunkCardClicked(nextIdx);
+    }
+
+    function updateNavButtonsState() {
+      const btnPrev = document.getElementById('btnPrev');
+      const btnNext = document.getElementById('btnNext');
+      if (!btnPrev || !btnNext || !currentLesson) return;
+
+      const total = currentLesson.chunks.length;
+      btnPrev.disabled = (selectedActiveIdx <= 0);
+      btnNext.disabled = (selectedActiveIdx >= total - 1);
     }
 
     function handleStartOrResumeDictation() {
@@ -1442,6 +1577,7 @@
       document.getElementById('btnRestart').disabled = false;
 
       renderChunks();
+      updateNavButtonsState();
       runDictationCycle();
     }
 
@@ -1452,6 +1588,7 @@
       const total = currentLesson.chunks.length;
       const maxPasses = Number(serverState.settings.repeatCount || 2);
 
+      // 全部播完：回到課題並停播
       if (idx >= total) {
         dictation.isRunning = false;
         dictation.isPaused = false;
@@ -1463,8 +1600,9 @@
 
         renderChunks();
         scrollChunkIntoView(0);
+        updateNavButtonsState();
 
-        document.getElementById('btnPlay').innerText = "▶ 開始讀默";
+        document.getElementById('btnPlay').innerText = "▶ 播放";
         document.getElementById('btnPlay').disabled = false;
         document.getElementById('btnPause').disabled = true;
         document.getElementById('playerBanner').innerText = "🎉 讀默完成";
@@ -1474,6 +1612,7 @@
       selectedActiveIdx = idx;
       renderChunks();
       scrollChunkIntoView(idx);
+      updateNavButtonsState();
 
       const chunk = currentLesson.chunks[idx];
       const banner = document.getElementById('playerBanner');
@@ -1543,7 +1682,7 @@
       player.onended = null;
 
       const btn = document.getElementById('btnPlay');
-      btn.innerText = "▶ 開始讀默";
+      btn.innerText = "▶ 播放";
       btn.disabled = !currentLesson;
       document.getElementById('btnPause').disabled = true;
     }
@@ -1564,6 +1703,7 @@
 
       renderChunks();
       scrollChunkIntoView(0);
+      updateNavButtonsState();
       runDictationCycle();
     }
 
@@ -1575,19 +1715,8 @@
         runDictationCycle();
       } else {
         const target = selectedActiveIdx >= 0 ? selectedActiveIdx : 0;
-        playSinglePreviewOnly(target);
+        onChunkCardClicked(target);
       }
-    }
-
-    function playSinglePreviewOnly(idx) {
-      if (!currentLesson || !audioBlobUrls[idx]) return;
-      ensureIosAudioKeepAlive();
-
-      const player = document.getElementById('mainAudio');
-      player.src = audioBlobUrls[idx];
-      player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
-      player.onended = null;
-      player.play();
     }
 
     function scrollChunkIntoView(idx) {
@@ -1909,7 +2038,7 @@
 
     /**
      * ========================================================================
-     * 通用工具函數
+     * 工具函數
      * ========================================================================
      */
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
