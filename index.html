@@ -16,6 +16,7 @@
       --text-main: #1e293b;
       --text-sub: #64748b;
       --border: #cbd5e1;
+      --nav-height: 64px;
     }
 
     * {
@@ -44,6 +45,7 @@
     }
 
     .top-nav {
+      height: var(--nav-height);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -144,6 +146,7 @@
       margin-bottom: 12px;
     }
 
+    /* 下拉選單平時清空文字（點擊時才顯示內容） */
     .lesson-select-blank {
       color: transparent !important;
     }
@@ -155,10 +158,22 @@
       background: #fff;
     }
 
+    /* 播放頁面控制器置頂吸頂容器 */
+    .sticky-player-controls {
+      position: sticky;
+      top: var(--nav-height);
+      background: var(--card-bg);
+      z-index: 40;
+      margin: 0 -16px 12px -16px;
+      padding: 4px 16px 10px 16px;
+      border-bottom: 1.5px solid var(--border);
+      box-shadow: 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    }
+
     .player-status-row {
       display: flex;
       align-items: center;
-      margin: 10px 0;
+      margin-bottom: 8px;
     }
 
     .voice-switch-badge {
@@ -207,6 +222,7 @@
       background: #fff;
       cursor: pointer;
       margin-bottom: 8px;
+      scroll-margin-top: 215px; /* 防遮擋：自動捲動時不會被置頂控制器蓋住 */
     }
 
     .chunk-card.active {
@@ -230,7 +246,11 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 6px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+    }
+
+    .controls-grid:last-child {
+      margin-bottom: 0;
     }
 
     .controls-grid .btn {
@@ -438,6 +458,7 @@
       transition: width 0.25s ease;
     }
 
+    /* 彈窗置頂標題列與捲動主體 */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -557,6 +578,7 @@
 
     <!-- 視圖 B：播放介面 -->
     <section id="viewPlayer" class="card" style="display:none;">
+      <!-- 課文切換下拉列 (向上捲動時會自然滾走) -->
       <div id="catalogBar" class="lesson-select-bar">
         <select id="lessonDropdown" class="lesson-select-blank" 
                 onchange="onSelectLessonFromDropdown(this.value); this.blur();" 
@@ -567,29 +589,32 @@
         <button id="btnManageLesson" class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
       </div>
 
-      <div class="player-status-row">
-        <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
-        
-        <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-          <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 載入中</span>
-          <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.1rem; display:none;" onclick="toggleMaskWithEye()">
-            👁️
-          </button>
+      <!-- 控制面板置頂吸頂容器 (捲動時緊密吸附在頂部導覽列下方) -->
+      <div class="sticky-player-controls">
+        <div class="player-status-row">
+          <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
+          
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+            <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 載入中</span>
+            <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.1rem; display:none;" onclick="toggleMaskWithEye()">
+              👁️
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- 第一行控制鍵：播放/繼續 ｜ 暫停 ｜ 由頭播放 -->
-      <div class="controls-grid">
-        <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 播放</button>
-        <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
-        <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 由頭播放</button>
-      </div>
+        <!-- 第一行控制鍵：播放/繼續 ｜ 暫停 ｜ 由頭播放 -->
+        <div class="controls-grid">
+          <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 播放</button>
+          <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
+          <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 由頭播放</button>
+        </div>
 
-      <!-- 第二行控制鍵：上一句 ｜ 重播 ｜ 下一句 -->
-      <div class="controls-grid">
-        <button id="btnPrev" class="btn btn-outline" onclick="handlePrevChunk()" disabled>⏮ 上一句</button>
-        <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播</button>
-        <button id="btnNext" class="btn btn-outline" onclick="handleNextChunk()" disabled>⏭ 下一句</button>
+        <!-- 第二行控制鍵：上一句 ｜ 重播 ｜ 下一句 -->
+        <div class="controls-grid">
+          <button id="btnPrev" class="btn btn-outline" onclick="handlePrevChunk()" disabled>⏮ 上一句</button>
+          <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播</button>
+          <button id="btnNext" class="btn btn-outline" onclick="handleNextChunk()" disabled>⏭ 下一句</button>
+        </div>
       </div>
 
       <audio id="mainAudio" playsinline controls style="width:100%; margin-bottom:8px;"></audio>
@@ -619,13 +644,11 @@
       <div class="modal-body">
         <label>課文標題:</label>
         
-        <!-- 標題純文字展示區 -->
         <div id="titleViewMode" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;">
           <span id="manageTitleText" style="font-weight:700; font-size:0.98rem; word-break:break-all;"></span>
           <button class="btn btn-outline" style="padding:5px 10px; font-size:0.8rem;" onclick="enableTitleEdit()">✏️ 修改</button>
         </div>
 
-        <!-- 點擊修改後轉為輸入框 -->
         <div id="titleEditMode" style="display:none; gap:6px; margin-bottom:12px; align-items:center;">
           <input type="text" id="manageTitleInput" style="flex:1;">
           <button class="btn btn-primary" style="padding:10px 12px; font-size:0.85rem;" onclick="saveLessonTitle()">儲存</button>
@@ -892,7 +915,6 @@
       }
     }
 
-    // 控制「管理課文」圖示在下載時變為旋轉漏斗 ⏳
     function setManageButtonLoading(loading) {
       const btn = document.getElementById('btnManageLesson');
       if (!btn) return;
@@ -1233,7 +1255,6 @@
       }
     }
 
-    // 核心單一語音下載函數
     async function executeVoiceDownload(voiceId) {
       const progBox = document.getElementById('voiceDownloadProgressBox');
       const progText = document.getElementById('voiceProgText');
@@ -1288,7 +1309,6 @@
       }
     }
 
-    // 單一語音下載入口
     async function downloadSingleVoice(voiceId) {
       if (!currentLesson || isVoiceDownloading) return;
       isVoiceDownloading = true;
@@ -1308,7 +1328,6 @@
       }
     }
 
-    // 一鍵下載全部未下載語音
     async function downloadAllPendingVoices() {
       if (!currentLesson || isVoiceDownloading) return;
       const voicesMap = currentLesson.voices || {};
@@ -1497,7 +1516,6 @@
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
 
-      // 停止連續讀默計時，重設播放按鈕為「播放」
       stopDictation();
 
       selectedActiveIdx = idx;
@@ -1512,7 +1530,6 @@
       const label = chunk.isTitle ? "課題" : `第 ${chunk.index} 句`;
       document.getElementById('playerBanner').innerText = `🔊 朗讀：${label}`;
 
-      // 單句播放音檔，播畢留在該句，不跳下一句
       const player = document.getElementById('mainAudio');
       if (audioBlobUrls[idx]) {
         player.src = audioBlobUrls[idx];
@@ -1524,13 +1541,11 @@
       }
     }
 
-    // 上一句按鈕
     function handlePrevChunk() {
       if (!currentLesson || selectedActiveIdx <= 0) return;
       onChunkCardClicked(selectedActiveIdx - 1);
     }
 
-    // 下一句按鈕
     function handleNextChunk() {
       if (!currentLesson) return;
       const total = currentLesson.chunks.length;
@@ -1588,7 +1603,6 @@
       const total = currentLesson.chunks.length;
       const maxPasses = Number(serverState.settings.repeatCount || 2);
 
-      // 全部播完：回到課題並停播
       if (idx >= total) {
         dictation.isRunning = false;
         dictation.isPaused = false;
@@ -2038,7 +2052,7 @@
 
     /**
      * ========================================================================
-     * 工具函數
+     * 通用工具函數
      * ========================================================================
      */
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
