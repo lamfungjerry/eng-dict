@@ -154,30 +154,12 @@
         <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
       </div>
 
+      <!-- 由 config.js 動態載入選項 -->
       <label>語音模型:</label>
-      <select id="setVoiceSelect" style="margin-bottom:10px;" onchange="markSettingsDirty()">
-        <optgroup label="Microsoft Azure">
-          <option value="en-HK-YanNeural">港澳英文女老師 (Yan)</option>
-          <option value="en-HK-SamNeural">港澳英文男老師 (Sam)</option>
-        </optgroup>
-        <optgroup label="Google Cloud">
-          <option value="en-US-Chirp3-HD-Aoede">美式自然女聲 (Aoede)</option>
-          <option value="en-US-Chirp3-HD-Kore">美式清晰女聲 (Kore)</option>
-          <option value="en-US-Chirp3-HD-Leda">美式溫柔女聲 (Leda)</option>
-          <option value="en-US-Chirp3-HD-Zephyr">美式輕快女聲 (Zephyr)</option>
-          <option value="en-US-Chirp3-HD-Puck">美式活力男聲 (Puck)</option>
-          <option value="en-US-Chirp3-HD-Charon">美式沉穩男聲 (Charon)</option>
-          <option value="en-US-Chirp3-HD-Fenrir">美式渾厚男聲 (Fenrir)</option>
-          <option value="en-US-Chirp3-HD-Orus">美式標準男聲 (Orus)</option>
-        </optgroup>
-      </select>
+      <select id="settingTtsVoice" style="margin-bottom:10px;" onchange="markSettingsDirty()"></select>
 
       <label>句子分拆模型:</label>
-      <select id="setGeminiSelect" style="margin-bottom:14px;" onchange="markSettingsDirty()">
-        <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-      </select>
+      <select id="settingGeminiModel" style="margin-bottom:14px;" onchange="markSettingsDirty()"></select>
 
       <!-- 2x2 卡片區 -->
       <div class="stepper-cards-row">
@@ -236,7 +218,7 @@
   <script>
     /**
      * ========================================================================
-     * 全域狀態与常數
+     * 全域狀態與常數
      * ========================================================================
      */
     const UNLOCK_STORAGE_KEY = 'dict_device_unlock_token';
@@ -291,24 +273,45 @@
 
     /**
      * ========================================================================
+     * 從 config.js 動態載入語音模型 (含 optgroup 分組) 及 Gemini 模型
+     * ========================================================================
+     */
+    function populateConfigDropdowns() {
+      const voiceSel = document.getElementById('settingTtsVoice');
+      const groups = {};
+      APP_CONFIG.TTS_VOICES.forEach(v => {
+        const groupName = v.provider || '其他';
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(v);
+      });
+
+      voiceSel.innerHTML = Object.keys(groups).map(groupName => `
+        <optgroup label="${groupName}">
+          ${groups[groupName].map(v => `<option value="${v.id}">${v.label}</option>`).join('')}
+        </optgroup>
+      `).join('');
+
+      const modelSel = document.getElementById('settingGeminiModel');
+      modelSel.innerHTML = APP_CONFIG.GEMINI_MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+    }
+
+    /**
+     * ========================================================================
      * 本機與跨裝置「顯示文字」鎖定控制邏輯
      * ========================================================================
      */
     function isDeviceUnlocked() {
       const savedToken = localStorage.getItem(UNLOCK_STORAGE_KEY);
       if (!savedToken) return false;
-      // 如已從 GAS 取得最新 token，必須完全吻合才算有效
       if (serverState.unlockToken) {
         return savedToken === serverState.unlockToken;
       }
       return true;
     }
 
-    // 每次進入系統與 GAS 同步後，驗證本機解鎖狀態是否已被遠端撤銷
     function reconcileUnlockTokenWithServer() {
       const savedToken = localStorage.getItem(UNLOCK_STORAGE_KEY);
       if (savedToken && serverState.unlockToken && savedToken !== serverState.unlockToken) {
-        // 通行證不吻合：徹底清空本機已解鎖狀態，等同從未解鎖過
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
       }
       updateLockCardUI();
@@ -328,7 +331,6 @@
         titleEl.style.color = "#16a34a";
         btn.className = "lock-action-btn btn-to-lock";
         btn.innerText = "鎖定";
-        // 已解鎖狀態下，才顯示整行的「一鍵鎖定所有裝置」按鈕
         if (btnRevokeAll) btnRevokeAll.style.display = 'inline-flex';
       } else {
         card.className = "stepper-mini-card lock-card is-locked";
@@ -361,16 +363,13 @@
       const btn = document.getElementById('btnToggleLock');
 
       if (unlocked) {
-        // 由已解鎖變成已上鎖：無需密碼，徹底清空本機紀錄（等同從未成功解鎖過）
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
         updateLockCardUI();
         updateMaskCheckboxState();
       } else {
-        // 由已上鎖變成解鎖：需輸入密碼向 GAS 驗證
         const pwd = window.prompt("請輸入解鎖密碼：");
         if (pwd === null || pwd.trim() === '') return;
 
-        const origText = btn.innerText;
         btn.disabled = true;
         btn.innerHTML = `<span class="loading-hourglass">⏳</span>`;
 
@@ -395,7 +394,6 @@
       }
     }
 
-    // 一鍵鎖定全屋所有裝置
     async function handleRevokeAllDevices() {
       if (!confirm("確定要一鍵鎖定所有裝置嗎？\n（包括本機及所有已解鎖的手機進入系統後都會自動上鎖）")) return;
 
@@ -406,7 +404,6 @@
       try {
         const res = await callGAS('revokeAllDevices');
         serverState.unlockToken = res.unlockToken;
-        // 同時徹底清空本機解鎖紀錄
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
         updateLockCardUI();
         updateMaskCheckboxState();
@@ -426,6 +423,7 @@
      * ========================================================================
      */
     window.onload = async function() {
+      populateConfigDropdowns();
       updateLockCardUI();
       updateMaskCheckboxState();
 
@@ -778,7 +776,6 @@
       banner.innerHTML = `<span class="loading-hourglass">⏳</span> 正在載入音檔...`;
       document.getElementById('btnPlay').disabled = true;
 
-      // 切換課文時預設為隱藏文字，並根據本機鎖定狀態控制可否取消勾選
       document.getElementById('maskTextCheckbox').checked = true;
       updateMaskCheckboxState();
 
@@ -831,7 +828,6 @@
       }
     }
 
-    // 漏洞 3 防護：隱藏文字時直接將底層英文字母與數字替換為圓點，杜絕頁內搜尋與複製偷看
     function maskEnglishChars(str) {
       return escapeHtml(String(str).replace(/[a-zA-Z0-9]/g, '●'));
     }
@@ -1139,7 +1135,7 @@
 
     /**
      * ========================================================================
-     * 系統設定 Modal 控制
+     * 系統設定 Modal 控制 (對應 settingTtsVoice 與 settingGeminiModel)
      * ========================================================================
      */
     function openSettingsModal() {
@@ -1154,8 +1150,8 @@
         pauseMultiplier: Number(serverState.settings.pauseMultiplier || 1.0)
       };
 
-      document.getElementById('setVoiceSelect').value = draftSettings.ttsVoice;
-      document.getElementById('setGeminiSelect').value = draftSettings.geminiModel;
+      document.getElementById('settingTtsVoice').value = draftSettings.ttsVoice;
+      document.getElementById('settingGeminiModel').value = draftSettings.geminiModel;
 
       refreshMiniStepperDisplay('playbackRate', 2);
       refreshMiniStepperDisplay('repeatCount', 0);
@@ -1200,8 +1196,8 @@
       btn.disabled = true;
       btn.innerHTML = `<span class="loading-hourglass">⏳</span> 同步中...`;
 
-      draftSettings.ttsVoice = document.getElementById('setVoiceSelect').value;
-      draftSettings.geminiModel = document.getElementById('setGeminiSelect').value;
+      draftSettings.ttsVoice = document.getElementById('settingTtsVoice').value;
+      draftSettings.geminiModel = document.getElementById('settingGeminiModel').value;
 
       serverState.settings = { ...draftSettings };
       applyBrowserPlaybackRate();
