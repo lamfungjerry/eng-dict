@@ -8,7 +8,7 @@ const APP_CONFIG = {
 
   // 2. 專放 MP3 與 lesson_{id}.json 的 GitHub-assets 倉庫資料
   GITHUB: {
-    owner: "iamfungjerry",      // 例如: "iamfungjerry"
+    owner: "lamfungjerry",
     assetsRepo: "eng-dict-assets",  // 專放 MP3 的倉庫名稱
     branch: "main"                  // 預設分支名稱
   },
