@@ -344,6 +344,32 @@
     .voice-manage-name { font-size: 0.9rem; font-weight: 600; }
     .voice-manage-status { font-size: 0.76rem; color: var(--text-sub); margin-top: 2px; }
 
+    /* 語音挑選項目專用樣式 */
+    .voice-pick-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: #fff;
+    }
+    .voice-pick-item:active, .voice-pick-item.active {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .voice-pick-tag {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #dbeafe;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
     label {
       display: block;
       font-size: 0.88rem;
@@ -401,21 +427,7 @@
       transition: width 0.25s ease;
     }
 
-    .modal-close-btn {
-      width: 40px;
-      height: 40px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      background: #fff;
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-
+    /* 彈窗置頂標題列與捲動主體 (標題與✕永不滾動消失) */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -432,9 +444,44 @@
       border-radius: 16px;
       max-width: 460px;
       width: 100%;
-      padding: 18px;
-      max-height: 88vh;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1.5px solid var(--border);
+      flex-shrink: 0;
+      background: #fff;
+      z-index: 10;
+    }
+
+    .modal-body {
+      padding: 16px 18px;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+    }
+
+    .modal-close-btn {
+      width: 38px;
+      height: 38px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -485,7 +532,11 @@
           <button type="button" class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem;" onclick="clearSelectedImage()">✕ 移除</button>
         </div>
 
-        <label style="margin-top:6px;">貼上 JSON:</label>
+        <!-- 句子分拆模型改放此處 -->
+        <label>句子分拆模型:</label>
+        <select id="addGeminiModelSelect" style="margin-bottom:12px;"></select>
+
+        <label>貼上 JSON:</label>
         <textarea id="jsonInputText" rows="6" placeholder="貼上 AI 分析的純 JSON..." oninput="validateInputState()"></textarea>
         <div id="jsonValidHint" style="font-size:0.82rem; margin-top:4px; font-weight:600; display:none;"></div>
 
@@ -497,7 +548,6 @@
 
     <!-- 視圖 B：播放介面 -->
     <section id="viewPlayer" class="card" style="display:none;">
-      <!-- 課文列：點擊時顯示文字，平時維持空白清空 -->
       <div id="catalogBar" class="lesson-select-bar">
         <select id="lessonDropdown" class="lesson-select-blank" 
                 onchange="onSelectLessonFromDropdown(this.value); this.blur();" 
@@ -512,7 +562,8 @@
         <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
         
         <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-          <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="quickJumpToVoiceSetting()">🎙️ 載入中</span>
+          <!-- 點擊語音標籤可直接切換此課文已下載的語音 -->
+          <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 載入中</span>
           <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.1rem; display:none;" onclick="toggleMaskWithEye()">
             👁️
           </button>
@@ -534,115 +585,121 @@
 
   </main>
 
-  <!-- 課文管理 Modal -->
+  <!-- 彈窗 1：選擇課文語音 (點擊 currentVoiceBadge 彈出) -->
+  <div id="voicePickerModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="card-title">🎙️ 選擇課文語音</h3>
+        <button class="modal-close-btn" onclick="closeModal('voicePickerModal')">✕</button>
+      </div>
+      <div class="modal-body" id="voicePickerList"></div>
+    </div>
+  </div>
+
+  <!-- 彈窗 2：課文管理 Modal (標題與✕按鈕置頂) -->
   <div id="manageLessonModal" class="modal-backdrop">
     <div class="modal">
-      <div class="card-header">
+      <div class="modal-header">
         <h3 class="card-title">📋 課文管理</h3>
         <button class="modal-close-btn" onclick="closeModal('manageLessonModal')">✕</button>
       </div>
-
-      <label>課文標題:</label>
-      <div style="display:flex; gap:8px; margin-bottom:14px;">
-        <input type="text" id="manageTitleInput" placeholder="課文標題">
-        <button class="btn btn-outline" style="padding:10px 14px; white-space:nowrap;" onclick="saveLessonTitle()">儲存標題</button>
-      </div>
-
-      <!-- 未下載語音列表 -->
-      <label>未下載語音:</label>
-      <div id="voicePendingListContainer" style="margin-bottom:12px;"></div>
-
-      <!-- 下載進度條 -->
-      <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
-        <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
-        <div class="progress-bar-bg" style="margin:0 0 4px 0;">
-          <div id="voiceProgBarFill" class="progress-bar-fill"></div>
+      <div class="modal-body">
+        <label>課文標題:</label>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" id="manageTitleInput" placeholder="課文標題">
+          <button class="btn btn-outline" style="padding:10px 14px; white-space:nowrap;" onclick="saveLessonTitle()">儲存標題</button>
         </div>
+
+        <label>未下載語音:</label>
+        <div id="voicePendingListContainer" style="margin-bottom:12px;"></div>
+
+        <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
+          <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
+          <div class="progress-bar-bg" style="margin:0 0 4px 0;">
+            <div id="voiceProgBarFill" class="progress-bar-fill"></div>
+          </div>
+        </div>
+
+        <label>已下載語音:</label>
+        <div id="voiceDownloadedListContainer" style="margin-bottom:16px;"></div>
+
+        <button class="btn btn-danger" style="width:100%; padding:12px;" onclick="deleteCurrentLesson()">
+          🗑️ 刪除此課文
+        </button>
       </div>
-
-      <!-- 已下載語音列表（排在進度條之後） -->
-      <label>已下載語音:</label>
-      <div id="voiceDownloadedListContainer" style="margin-bottom:16px;"></div>
-
-      <button class="btn btn-danger" style="width:100%; padding:12px;" onclick="deleteCurrentLesson()">
-        🗑️ 刪除此課文
-      </button>
     </div>
   </div>
 
-  <!-- API Key 設定 Modal -->
+  <!-- 彈窗 3：API Key 設定 Modal (標題與✕按鈕置頂) -->
   <div id="keyModal" class="modal-backdrop">
     <div class="modal">
-      <div class="card-header">
+      <div class="modal-header">
         <h3 class="card-title">🔑 API 金鑰</h3>
         <button class="modal-close-btn" onclick="closeKeyModal()">✕</button>
       </div>
-      <div id="keyItemsContainer"></div>
-      <button id="btnKeySubmit" class="btn" style="width:100%; margin-top:16px;" onclick="onKeyModalSubmit()">
-        關閉
-      </button>
+      <div class="modal-body">
+        <div id="keyItemsContainer"></div>
+        <button id="btnKeySubmit" class="btn" style="width:100%; margin-top:16px;" onclick="onKeyModalSubmit()">
+          關閉
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- 系統設定 Modal -->
+  <!-- 彈窗 4：系統設定 Modal (標題與✕按鈕置頂，已移除語音選單) -->
   <div id="settingsModal" class="modal-backdrop">
     <div class="modal">
-      <div class="card-header">
+      <div class="modal-header">
         <h3 class="card-title">⚙️ 系統設定</h3>
         <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
       </div>
+      <div class="modal-body">
+        <div class="stepper-cards-row">
+          <div class="stepper-mini-card">
+            <div class="stepper-mini-title">播放語速</div>
+            <div class="stepper-control">
+              <button type="button" class="stepper-btn" onclick="stepSetting('playbackRate', 0.05, 0.5, 1.5, 2)">＋</button>
+              <input type="text" id="input_playbackRate" class="stepper-display" readonly>
+              <button type="button" class="stepper-btn" onclick="stepSetting('playbackRate', -0.05, 0.5, 1.5, 2)">－</button>
+            </div>
+          </div>
 
-      <label>語音模型:</label>
-      <select id="settingTtsVoice" style="margin-bottom:10px;" onchange="markSettingsDirty()"></select>
+          <div class="stepper-mini-card">
+            <div class="stepper-mini-title">朗讀次數</div>
+            <div class="stepper-control">
+              <button type="button" class="stepper-btn" onclick="stepSetting('repeatCount', 1, 1, 5, 0)">＋</button>
+              <input type="text" id="input_repeatCount" class="stepper-display" readonly>
+              <button type="button" class="stepper-btn" onclick="stepSetting('repeatCount', -1, 1, 5, 0)">－</button>
+            </div>
+          </div>
 
-      <label>句子分拆模型:</label>
-      <select id="settingGeminiModel" style="margin-bottom:14px;" onchange="markSettingsDirty()"></select>
+          <div class="stepper-mini-card">
+            <div class="stepper-mini-title">停頓倍率</div>
+            <div class="stepper-control">
+              <button type="button" class="stepper-btn" onclick="stepSetting('pauseMultiplier', 0.1, 0.5, 2.0, 1)">＋</button>
+              <input type="text" id="input_pauseMultiplier" class="stepper-display" readonly>
+              <button type="button" class="stepper-btn" onclick="stepSetting('pauseMultiplier', -0.1, 0.5, 2.0, 1)">－</button>
+            </div>
+          </div>
 
-      <div class="stepper-cards-row">
-        <div class="stepper-mini-card">
-          <div class="stepper-mini-title">播放語速</div>
-          <div class="stepper-control">
-            <button type="button" class="stepper-btn" onclick="stepSetting('playbackRate', 0.05, 0.5, 1.5, 2)">＋</button>
-            <input type="text" id="input_playbackRate" class="stepper-display" readonly>
-            <button type="button" class="stepper-btn" onclick="stepSetting('playbackRate', -0.05, 0.5, 1.5, 2)">－</button>
+          <div id="cardTextLock" class="stepper-mini-card lock-card is-locked">
+            <div id="cardTextLockTitle" class="stepper-mini-title" style="color:#dc2626;">顯示文字</div>
+            <div class="stepper-control">
+              <button type="button" id="btnToggleLock" class="lock-action-btn btn-to-unlock" onclick="handleLockToggle()">
+                解鎖
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="stepper-mini-card">
-          <div class="stepper-mini-title">朗讀次數</div>
-          <div class="stepper-control">
-            <button type="button" class="stepper-btn" onclick="stepSetting('repeatCount', 1, 1, 5, 0)">＋</button>
-            <input type="text" id="input_repeatCount" class="stepper-display" readonly>
-            <button type="button" class="stepper-btn" onclick="stepSetting('repeatCount', -1, 1, 5, 0)">－</button>
-          </div>
-        </div>
+        <button type="button" id="btnRevokeAllLocks" class="btn-lock-all-devices" onclick="handleRevokeAllDevices()">
+          🔒 鎖定所有裝置
+        </button>
 
-        <div class="stepper-mini-card">
-          <div class="stepper-mini-title">停頓倍率</div>
-          <div class="stepper-control">
-            <button type="button" class="stepper-btn" onclick="stepSetting('pauseMultiplier', 0.1, 0.5, 2.0, 1)">＋</button>
-            <input type="text" id="input_pauseMultiplier" class="stepper-display" readonly>
-            <button type="button" class="stepper-btn" onclick="stepSetting('pauseMultiplier', -0.1, 0.5, 2.0, 1)">－</button>
-          </div>
-        </div>
-
-        <div id="cardTextLock" class="stepper-mini-card lock-card is-locked">
-          <div id="cardTextLockTitle" class="stepper-mini-title" style="color:#dc2626;">顯示文字</div>
-          <div class="stepper-control">
-            <button type="button" id="btnToggleLock" class="lock-action-btn btn-to-unlock" onclick="handleLockToggle()">
-              解鎖
-            </button>
-          </div>
-        </div>
+        <button id="btnSettingsSubmit" class="btn" style="width:100%; margin-top:4px;" onclick="onSettingsModalSubmit()">
+          關閉
+        </button>
       </div>
-
-      <button type="button" id="btnRevokeAllLocks" class="btn-lock-all-devices" onclick="handleRevokeAllDevices()">
-        🔒 鎖定所有裝置
-      </button>
-
-      <button id="btnSettingsSubmit" class="btn" style="width:100%; margin-top:4px;" onclick="onSettingsModalSubmit()">
-        關閉
-      </button>
     </div>
   </div>
 
@@ -657,8 +714,6 @@
     let serverState = {
       keyStatus: {},
       settings: {
-        ttsVoice: 'en-HK-YanNeural',
-        geminiModel: 'gemini-3.6-flash',
         playbackRate: 0.8,
         repeatCount: 2,
         pauseMultiplier: 1.0
@@ -677,7 +732,7 @@
 
     let isTextMasked = true;
     let selectedActiveIdx = -1;
-    let isVoiceDownloading = false; // 單一下載互斥鎖
+    let isVoiceDownloading = false;
 
     let dictation = {
       isRunning: false,
@@ -732,22 +787,10 @@
     };
 
     function populateConfigDropdowns() {
-      const voiceSel = document.getElementById('settingTtsVoice');
-      const groups = {};
-      APP_CONFIG.TTS_VOICES.forEach(v => {
-        const groupName = v.provider || '其他';
-        if (!groups[groupName]) groups[groupName] = [];
-        groups[groupName].push(v);
-      });
-
-      voiceSel.innerHTML = Object.keys(groups).map(groupName => `
-        <optgroup label="${groupName}">
-          ${groups[groupName].map(v => `<option value="${v.id}">${v.label}</option>`).join('')}
-        </optgroup>
-      `).join('');
-
-      const modelSel = document.getElementById('settingGeminiModel');
-      modelSel.innerHTML = APP_CONFIG.GEMINI_MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+      const modelSel = document.getElementById('addGeminiModelSelect');
+      if (modelSel) {
+        modelSel.innerHTML = APP_CONFIG.GEMINI_MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+      }
     }
 
     async function callGAS(action, payloadObj = {}) {
@@ -773,7 +816,6 @@
         reconcileUnlockTokenWithServer();
         refreshKeyAlertDot();
         applyBrowserPlaybackRate();
-        updateVoiceBadge();
       } catch (e) {
         console.error("GAS 連線失敗:", e);
       }
@@ -805,24 +847,87 @@
       return `${gender}-${name}`;
     }
 
-    function updateVoiceBadge() {
-      const badge = document.getElementById('currentVoiceBadge');
-      if (!badge) return;
-      const voiceId = serverState.settings.ttsVoice || 'en-HK-YanNeural';
-      badge.innerText = `🎙️ ${getShortVoiceName(voiceId)}`;
-      badge.style.display = 'inline-flex';
+    function getVoiceFullLabel(voiceId) {
+      const item = APP_CONFIG.TTS_VOICES.find(v => v.id === voiceId);
+      return item ? item.label : voiceId;
     }
 
-    function quickJumpToVoiceSetting() {
-      openSettingsModal();
-      setTimeout(() => {
-        const sel = document.getElementById('settingTtsVoice');
-        if (sel) {
-          sel.focus();
-          sel.style.outline = "2px solid #2563eb";
-          setTimeout(() => { sel.style.outline = "none"; }, 1500);
+    function updateVoiceBadge() {
+      const badge = document.getElementById('currentVoiceBadge');
+      if (!badge || !currentLesson) return;
+      const voiceId = currentLesson.selectedVoice;
+      if (voiceId) {
+        badge.innerText = `🎙️ ${getShortVoiceName(voiceId)}`;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    /**
+     * ========================================================================
+     * 課文專屬語音選擇 Modal
+     * ========================================================================
+     */
+    function openVoicePickerModal() {
+      if (!currentLesson) return;
+      const container = document.getElementById('voicePickerList');
+      const voicesMap = currentLesson.voices || {};
+      const downloadedVoiceIds = Object.keys(voicesMap).filter(id => voicesMap[id] && voicesMap[id].downloaded);
+
+      if (downloadedVoiceIds.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:16px 0; color:var(--text-sub); font-size:0.9rem;">
+            此課文尚未下載任何語音模型。<br>請先至課文管理下載語音。
+          </div>
+          <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="closeModal('voicePickerModal'); openLessonManageModal();">
+            📋 前往課文管理下載
+          </button>
+        `;
+        openModal('voicePickerModal');
+        return;
+      }
+
+      const activeVoice = currentLesson.selectedVoice || downloadedVoiceIds[0];
+
+      container.innerHTML = downloadedVoiceIds.map(vid => {
+        const isActive = (vid === activeVoice);
+        return `
+          <div class="voice-pick-item ${isActive ? 'active' : ''}" onclick="selectLessonVoice('${vid}')">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.1rem;">${isActive ? '✅' : '⚪'}</span>
+              <span style="font-weight:600; font-size:0.95rem;">${getVoiceFullLabel(vid)}</span>
+            </div>
+            <span class="voice-pick-tag">${getShortVoiceName(vid)}</span>
+          </div>
+        `;
+      }).join('') + `
+        <button class="btn btn-outline" style="width:100%; margin-top:14px; padding:10px;" onclick="closeModal('voicePickerModal'); openLessonManageModal();">
+          ➕ 下載更多語音模型
+        </button>
+      `;
+
+      openModal('voicePickerModal');
+    }
+
+    async function selectLessonVoice(voiceId) {
+      closeModal('voicePickerModal');
+      if (!currentLesson || currentLesson.selectedVoice === voiceId) return;
+
+      currentLesson.selectedVoice = voiceId;
+      updateVoiceBadge();
+
+      // 即時重新載入該語音模型的音檔
+      await reloadAudioForCurrentLesson();
+
+      // 背景即時同步寫入該課文的 lesson.json (GitHub & Drive)
+      callGAS('setLessonVoice', {
+        payload: {
+          folderName: currentLesson.folderName,
+          voiceName: voiceId,
+          ghConfig: APP_CONFIG.GITHUB
         }
-      }, 200);
+      }).catch(err => console.error("同步課文語音設定失敗:", err));
     }
 
     /**
@@ -941,6 +1046,7 @@
       const jsonText = document.getElementById('jsonInputText').value.trim();
       const fileInput = document.getElementById('ocrImageInput');
       const btn = document.getElementById('btnStartBuild');
+      const chosenModel = document.getElementById('addGeminiModelSelect').value;
 
       btn.disabled = true;
       btn.innerHTML = `<span class="loading-hourglass">⏳</span> 正在生成...`;
@@ -962,7 +1068,7 @@
             directJson: directJson,
             imageBase64: imageBase64,
             imageMimeType: imageMimeType,
-            geminiModel: serverState.settings.geminiModel,
+            geminiModel: chosenModel,
             ghConfig: APP_CONFIG.GITHUB
           }
         });
@@ -985,7 +1091,7 @@
 
     /**
      * ========================================================================
-     * 課文管理 Modal (逐個下載、鎖定互斥、已下載移至進度條後)
+     * 課文管理 Modal
      * ========================================================================
      */
     function openLessonManageModal() {
@@ -1009,7 +1115,6 @@
         const isDownloaded = Boolean(info && info.downloaded);
 
         if (isDownloaded) {
-          // 已下載：不提供重新下載，只顯示狀態
           downloadedHtml.push(`
             <div class="voice-manage-item">
               <div class="voice-manage-info">
@@ -1019,7 +1124,6 @@
             </div>
           `);
         } else {
-          // 未下載：提供下載按鈕，下載進行時鎖定按鈕
           pendingHtml.push(`
             <div class="voice-manage-item">
               <div class="voice-manage-info">
@@ -1067,7 +1171,6 @@
       }
     }
 
-    // 逐個下載語音 (鎖定其他按鈕)
     async function downloadSingleVoice(voiceId) {
       if (!currentLesson || isVoiceDownloading) return;
       isVoiceDownloading = true;
@@ -1122,8 +1225,9 @@
         currentLesson = commitRes.lesson;
         lessonsIndex = commitRes.indexList;
 
-        if (serverState.settings.ttsVoice === voiceId) {
-          await selectLesson(targetFolder);
+        // 若切換為剛下載的語音，立即刷新音檔
+        if (currentLesson.selectedVoice === voiceId) {
+          await reloadAudioForCurrentLesson();
         }
 
       } catch (err) {
@@ -1132,6 +1236,7 @@
         isVoiceDownloading = false;
         progBox.style.display = 'none';
         renderVoiceManageList();
+        updateVoiceBadge();
       }
     }
 
@@ -1188,7 +1293,6 @@
 
       isTextMasked = true;
       updateEyeBtnUI();
-      updateVoiceBadge();
 
       try {
         const res = await fetch(getRawUrl(`${folderName}/lesson.json`));
@@ -1196,57 +1300,73 @@
         currentLesson = await res.json();
         currentLesson.folderName = folderName;
 
+        // 確認該課文綁定的語音模型
+        const downloadedVoices = Object.keys(currentLesson.voices || {}).filter(k => currentLesson.voices[k].downloaded);
+        if (!currentLesson.selectedVoice && downloadedVoices.length > 0) {
+          currentLesson.selectedVoice = downloadedVoices[0];
+        }
+
         renderCatalogDropdown();
         renderChunks();
+        updateVoiceBadge();
 
-        // 只要 load 到課題與句子，立即隱藏全域「連線中...」遮罩！
+        // 載入到課文內容立即隱藏「連線中...」遮罩
         document.getElementById('globalLoadingCard').style.display = 'none';
 
-        Object.values(audioBlobUrls).forEach(u => URL.revokeObjectURL(u));
-        audioBlobUrls = {};
-
-        const voiceName = serverState.settings.ttsVoice || 'en-HK-YanNeural';
-        let loaded = 0;
-        const total = currentLesson.chunks.length;
-
-        await Promise.all(currentLesson.chunks.map(async (chunk) => {
-          let blobUrl = null;
-          const fileName = getDriveMp3Name(chunk.index, chunk.text);
-          const audioPath = `${folderName}/${voiceName}/${fileName}`;
-
-          try {
-            const r = await fetch(getCdnUrl(audioPath));
-            if (r.ok) {
-              const b = await r.blob();
-              blobUrl = URL.createObjectURL(b);
-            }
-          } catch (e) {}
-
-          if (!blobUrl) {
-            const fb = await callGAS('fallbackGetAudio', {
-              payload: {
-                folderName: folderName,
-                voiceName: voiceName,
-                chunk: chunk
-              }
-            });
-            blobUrl = fb.audioData;
-          }
-
-          audioBlobUrls[chunk.index] = blobUrl;
-          loaded++;
-          banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔 ${loaded}/${total}...`;
-        }));
-
-        banner.innerText = `✅ 已就緒`;
-        document.getElementById('btnPlay').disabled = false;
-        document.getElementById('btnRestart').disabled = false;
-        document.getElementById('btnReplay').disabled = false;
+        await reloadAudioForCurrentLesson();
 
       } catch (err) {
         document.getElementById('globalLoadingCard').style.display = 'none';
         banner.innerText = "❌ 載入失敗: " + err.message;
       }
+    }
+
+    async function reloadAudioForCurrentLesson() {
+      if (!currentLesson) return;
+      const banner = document.getElementById('playerBanner');
+      banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔...`;
+
+      Object.values(audioBlobUrls).forEach(u => URL.revokeObjectURL(u));
+      audioBlobUrls = {};
+
+      const voiceName = currentLesson.selectedVoice || 'en-HK-YanNeural';
+      const folderName = currentLesson.folderName;
+      let loaded = 0;
+      const total = currentLesson.chunks.length;
+
+      await Promise.all(currentLesson.chunks.map(async (chunk) => {
+        let blobUrl = null;
+        const fileName = getDriveMp3Name(chunk.index, chunk.text);
+        const audioPath = `${folderName}/${voiceName}/${fileName}`;
+
+        try {
+          const r = await fetch(getCdnUrl(audioPath));
+          if (r.ok) {
+            const b = await r.blob();
+            blobUrl = URL.createObjectURL(b);
+          }
+        } catch (e) {}
+
+        if (!blobUrl) {
+          const fb = await callGAS('fallbackGetAudio', {
+            payload: {
+              folderName: folderName,
+              voiceName: voiceName,
+              chunk: chunk
+            }
+          });
+          blobUrl = fb.audioData;
+        }
+
+        audioBlobUrls[chunk.index] = blobUrl;
+        loaded++;
+        banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔 ${loaded}/${total}...`;
+      }));
+
+      banner.innerText = `✅ 已就緒`;
+      document.getElementById('btnPlay').disabled = false;
+      document.getElementById('btnRestart').disabled = false;
+      document.getElementById('btnReplay').disabled = false;
     }
 
     function renderChunks() {
@@ -1729,15 +1849,10 @@
       document.getElementById('btnSettingsSubmit').innerText = "關閉";
 
       draftSettings = {
-        ttsVoice: serverState.settings.ttsVoice || 'en-HK-YanNeural',
-        geminiModel: serverState.settings.geminiModel || 'gemini-3.6-flash',
         playbackRate: Number(serverState.settings.playbackRate || 0.8),
         repeatCount: Number(serverState.settings.repeatCount || 2),
         pauseMultiplier: Number(serverState.settings.pauseMultiplier || 1.0)
       };
-
-      document.getElementById('settingTtsVoice').value = draftSettings.ttsVoice;
-      document.getElementById('settingGeminiModel').value = draftSettings.geminiModel;
 
       refreshMiniStepperDisplay('playbackRate', 2);
       refreshMiniStepperDisplay('repeatCount', 0);
@@ -1777,22 +1892,13 @@
       btn.disabled = true;
       btn.innerHTML = `<span class="loading-hourglass">⏳</span> 同步中...`;
 
-      const oldVoice = serverState.settings.ttsVoice;
-      draftSettings.ttsVoice = document.getElementById('settingTtsVoice').value;
-      draftSettings.geminiModel = document.getElementById('settingGeminiModel').value;
-
       serverState.settings = { ...draftSettings };
       applyBrowserPlaybackRate();
-      updateVoiceBadge();
       renderChunks();
 
       try {
         serverState = await callGAS('saveSettings', { settings: draftSettings });
         closeSettingsModal();
-        if (oldVoice !== serverState.settings.ttsVoice && currentLesson) {
-          const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
-          await selectLesson(targetFolder);
-        }
       } catch (e) {
         alert("儲存設定失敗: " + e.message);
       } finally {
@@ -1803,7 +1909,7 @@
 
     /**
      * ========================================================================
-     * 工具函數
+     * 通用工具函數
      * ========================================================================
      */
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
