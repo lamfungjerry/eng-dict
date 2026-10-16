@@ -68,31 +68,42 @@
 
     <!-- 視圖 B：【播放介面】 -->
     <section id="viewPlayer" class="card" style="display:none;">
-      <!-- 下拉列 + ➕加入按鈕 + 📋管理按鈕 -->
+      <!-- 課文列：選定後遮蔽標題 + ↩️返回重選按鈕 + ➕加入按鈕 + 📋管理按鈕 -->
       <div id="catalogBar" class="lesson-select-bar">
-        <select id="lessonDropdown" onchange="selectLesson(this.value)"></select>
+        <!-- 挑選中模式 -->
+        <div id="lessonPickerBox" style="flex:1; display:none;">
+          <select id="lessonDropdown" onchange="onSelectLessonDropdown(this.value)"></select>
+        </div>
+        <!-- 已選定模式 (遮蔽課文標題) -->
+        <div id="lessonChosenBox" style="flex:1; display:flex; align-items:center; gap:8px;">
+          <button class="icon-btn" onclick="showLessonDropdownPicker()" title="重新揀選課文">↩️</button>
+          <div id="maskedLessonHeader" class="masked-lesson-box"></div>
+        </div>
+
         <button class="icon-btn" onclick="switchView('ADD')" title="加入新課文">➕</button>
         <button class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
       </div>
 
-      <!-- 狀態列：就緒提示 + 當前語音模型標籤 (點擊可快速跳入設定更換) + 隱藏文字開關 -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
+      <!-- 狀態列：狀態提示 + (移到最右側的)語音模型標籤 + 眼睛Icon (已解鎖時才顯示) -->
+      <div class="player-status-row">
+        <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
+        
+        <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
           <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="quickJumpToVoiceSetting()">🎙️ 載入中</span>
+          <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.1rem; display:none;" onclick="toggleMaskWithEye()" title="顯示/遮蔽文字">
+            👁️
+          </button>
         </div>
-        <label id="maskLabelContainer" style="margin:0; font-size:0.84rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-          <input type="checkbox" id="maskTextCheckbox" onchange="renderChunks()" checked> 🙈 隱藏文字 <span id="maskLockIndicator" style="display:none; font-size:0.8rem;">🔒</span>
-        </label>
       </div>
 
+      <!-- 播放控制鍵：開始讀默 + 暫停 + 重播此句 + ⏮ 重頭開始 -->
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
-        <button id="btnPlay" class="btn btn-success" onclick="startOrResumeDictation()" disabled>▶ 開始讀默</button>
+        <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 開始讀默</button>
         <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
       </div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:12px;">
         <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播此句</button>
-        <button id="btnStop" class="btn btn-outline" onclick="stopDictation()" disabled>⏹ 停止</button>
+        <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 重頭開始</button>
       </div>
 
       <audio id="mainAudio" playsinline controls style="width:100%; margin-bottom:8px;"></audio>
@@ -101,7 +112,7 @@
 
   </main>
 
-  <!-- 彈窗 1：【課文管理 Modal】 (修改 Title、下載/同步各語音模型、刪除課文) -->
+  <!-- 彈窗 1：【課文管理 Modal】 -->
   <div id="manageLessonModal" class="modal-backdrop">
     <div class="modal">
       <div class="card-header">
@@ -118,7 +129,6 @@
       <label>語言模型下載狀態:</label>
       <div id="voiceManageListContainer" style="margin-bottom:16px;"></div>
 
-      <!-- 下載進度條 (點擊下載語音時顯示) -->
       <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
         <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
         <div class="progress-bar-bg" style="margin:0 0 4px 0;">
@@ -146,7 +156,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 3：【系統設定 Modal】 (2x2 卡片) -->
+  <!-- 彈窗 3：【系統設定 Modal】 -->
   <div id="settingsModal" class="modal-backdrop">
     <div class="modal">
       <div class="card-header">
@@ -237,6 +247,9 @@
     let currentLesson = null;
     let audioBlobUrls = {};
 
+    let isTextMasked = true; // 預設強制遮蔽文字
+    let selectedActiveIdx = -1; // 當前 Active 的卡片 (-1 代表未選取任何卡片)
+
     let dictation = {
       isRunning: false,
       isPaused: false,
@@ -264,13 +277,32 @@
 
     /**
      * ========================================================================
+     * 檔名規格同步函數 (與 Google Drive 100% 一致)
+     * ========================================================================
+     */
+    function sanitizeFileName(str) {
+      return String(str || '').replace(/[^a-zA-Z0-9\u4e00-\u9fa5_\-]/g, "_").substring(0, 45);
+    }
+
+    function getDriveMp3Name(index, text) {
+      const padded = String(index).padStart(3, '0');
+      return `${padded}_${sanitizeFileName(text)}.mp3`;
+    }
+
+    // 黑色膠帶遮蔽：英文字母替換為 X (大寫) 與 x (小寫)
+    function maskEnglishChars(str) {
+      return escapeHtml(String(str).replace(/[A-Z]/g, 'X').replace(/[a-z]/g, 'x').replace(/[0-9]/g, 'X'));
+    }
+
+    /**
+     * ========================================================================
      * 初始化
      * ========================================================================
      */
     window.onload = async function() {
       populateConfigDropdowns();
       updateLockCardUI();
-      updateMaskCheckboxState();
+      updateEyeBtnUI();
 
       await syncInitStateFromGAS();
       await loadCatalogFromGitHub();
@@ -333,7 +365,6 @@
       }
     }
 
-    // 格式化語音模型名稱，例如：女-Yan 或 男-Fenrir
     function getShortVoiceName(voiceId) {
       const item = APP_CONFIG.TTS_VOICES.find(v => v.id === voiceId);
       if (!item) return voiceId;
@@ -354,7 +385,6 @@
       badge.style.display = 'inline-flex';
     }
 
-    // 點擊狀態列標籤，快速打開系統設定並聚焦語音選單
     function quickJumpToVoiceSetting() {
       openSettingsModal();
       setTimeout(() => {
@@ -369,7 +399,7 @@
 
     /**
      * ========================================================================
-     * 畫面切換與輸入驗證
+     * 畫面切換與課文選定狀態
      * ========================================================================
      */
     function switchView(mode) {
@@ -459,9 +489,35 @@
       });
     }
 
+    // 課文選取器顯示切換 (選定後遮蔽標題 + 返回按鈕)
+    function showLessonDropdownPicker() {
+      document.getElementById('lessonPickerBox').style.display = 'block';
+      document.getElementById('lessonChosenBox').style.display = 'none';
+    }
+
+    function showLessonChosenView() {
+      document.getElementById('lessonPickerBox').style.display = 'none';
+      document.getElementById('lessonChosenBox').style.display = 'flex';
+      renderMaskedLessonHeader();
+    }
+
+    function renderMaskedLessonHeader() {
+      const headerBox = document.getElementById('maskedLessonHeader');
+      if (!currentLesson || !headerBox) return;
+      if (isTextMasked) {
+        headerBox.innerHTML = `<span class="chunk-text masked">${maskEnglishChars(currentLesson.title)}</span>`;
+      } else {
+        headerBox.innerText = currentLesson.title;
+      }
+    }
+
+    function onSelectLessonFromDropdown(id) {
+      selectLesson(id);
+    }
+
     /**
      * ========================================================================
-     * 新流程：建立課文結構 -> 立即進入管理畫面選擇下載語音
+     * 課文結構生成 -> 進入管理畫面挑選下載語音
      * ========================================================================
      */
     async function startBuildProcess() {
@@ -498,9 +554,8 @@
         currentLesson = data.lesson;
         renderCatalogDropdown();
         switchView('PLAYER');
-        selectLesson(currentLesson.id);
+        await selectLesson(currentLesson.id);
 
-        // 立即彈出「課文管理視窗」，讓使用者挑選下載哪一個語言模型
         openLessonManageModal();
 
       } catch (err) {
@@ -513,7 +568,7 @@
 
     /**
      * ========================================================================
-     * 課文管理 Modal (修改 Title、下載/同步語音模型、刪除課文)
+     * 課文管理 Modal
      * ========================================================================
      */
     function openLessonManageModal() {
@@ -568,6 +623,7 @@
         currentLesson = data.lesson;
         lessonsIndex = data.indexList;
         renderCatalogDropdown();
+        renderMaskedLessonHeader();
         renderChunks();
         progBox.style.display = 'none';
         alert("✅ 標題已成功修改！");
@@ -577,7 +633,6 @@
       }
     }
 
-    // 針對單一語言模型執行批次下載與 GitHub Commit
     async function downloadSpecificVoice(voiceId) {
       if (!currentLesson) return;
       const progBox = document.getElementById('voiceDownloadProgressBox');
@@ -631,11 +686,10 @@
         renderVoiceManageList();
         progBox.style.display = 'none';
 
-        // 如果目前設定正選用此語音，立即預載音檔供播放
         if (serverState.settings.ttsVoice === voiceId) {
           await selectLesson(currentLesson.id);
         }
-        alert(`✅ 語音模型「${getShortVoiceName(voiceId)}」已成功下載就緒！`);
+        alert(`✅ 語音模型「${getShortVoiceName(voiceId)}」已成功下載！`);
 
       } catch (err) {
         progBox.style.display = 'none';
@@ -645,7 +699,7 @@
 
     /**
      * ========================================================================
-     * 課文目錄與播放引擎
+     * 課文播放引擎
      * ========================================================================
      */
     function getRawUrl(path) {
@@ -686,12 +740,16 @@
 
     async function selectLesson(lessonId) {
       stopDictation();
+      selectedActiveIdx = -1; // 重置 Active 卡片
+
       const banner = document.getElementById('playerBanner');
       banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔中...`;
       document.getElementById('btnPlay').disabled = true;
+      document.getElementById('btnRestart').disabled = true;
 
-      document.getElementById('maskTextCheckbox').checked = true;
-      updateMaskCheckboxState();
+      // 預設為隱藏文字
+      isTextMasked = true;
+      updateEyeBtnUI();
       updateVoiceBadge();
 
       try {
@@ -700,6 +758,7 @@
         currentLesson = await res.json();
 
         renderCatalogDropdown();
+        showLessonChosenView();
         renderChunks();
 
         Object.values(audioBlobUrls).forEach(u => URL.revokeObjectURL(u));
@@ -709,9 +768,11 @@
         let loaded = 0;
         const total = currentLesson.chunks.length;
 
+        // 音檔結構與 Google Drive 100% 一致: eng-dict/{課文名}/{語音名}/{000_text.mp3}
         await Promise.all(currentLesson.chunks.map(async (chunk) => {
           let blobUrl = null;
-          const audioPath = `audio/${currentLesson.id}/${voiceName}/${chunk.index}.mp3`;
+          const fileName = getDriveMp3Name(chunk.index, chunk.text);
+          const audioPath = `eng-dict/${sanitizeFileName(currentLesson.title)}/${voiceName}/${fileName}`;
 
           try {
             const r = await fetch(getCdnUrl(audioPath));
@@ -721,7 +782,6 @@
             }
           } catch (e) {}
 
-          // 若 CDN 尚無音檔，自動 Fallback 至 Drive 或即時生成
           if (!blobUrl) {
             const fb = await callGAS('fallbackGetAudio', {
               payload: {
@@ -740,6 +800,7 @@
 
         banner.innerText = `✅ 已準備就緒`;
         document.getElementById('btnPlay').disabled = false;
+        document.getElementById('btnRestart').disabled = false;
         document.getElementById('btnReplay').disabled = false;
 
       } catch (err) {
@@ -747,76 +808,57 @@
       }
     }
 
-    // 黑色圖層遮蔽：英文字母替換為 X/x + 黑色矩形塊
-    function maskEnglishChars(str) {
-      return escapeHtml(String(str).replace(/[A-Z]/g, 'X').replace(/[a-z]/g, 'x').replace(/[0-9]/g, 'X'));
-    }
-
+    // 渲染卡片 (固定寬度序號/定位Icon + 黑色膠帶遮蔽)
     function renderChunks() {
       const cont = document.getElementById('chunkListContainer');
       if (!currentLesson) { cont.innerHTML = ''; return; }
 
-      const isMasked = document.getElementById('maskTextCheckbox').checked;
       const mult = Number(serverState.settings.pauseMultiplier || 1.0);
 
       cont.innerHTML = currentLesson.chunks.map((c, idx) => {
         const waitSec = Math.max(1, Math.round(c.pauseSeconds * mult));
-        const isActive = dictation.isRunning && dictation.chunkIdx === idx;
-        const contentStr = isMasked ? maskEnglishChars(c.text) : escapeHtml(c.text);
-        const displayText = c.isTitle ? `📌 題目：${contentStr}` : `${c.index}. ${contentStr}`;
+        const isActive = (selectedActiveIdx === idx);
+
+        // Active 時序號變成定位 Icon 📍；非 Active 時顯示 T. 或 數字.
+        let numLabel = c.isTitle ? "T." : `${c.index}.`;
+        let numDisplay = isActive ? "📍" : numLabel;
+
+        const contentStr = isTextMasked ? maskEnglishChars(c.text) : escapeHtml(c.text);
+
         return `
-          <div id="chunk_row_${idx}" class="chunk-card ${isActive ? 'active' : ''}" onclick="playSinglePreview(${idx})">
-            <span class="chunk-text ${isMasked ? 'masked' : ''}">${displayText}</span>
+          <div id="chunk_row_${idx}" class="chunk-card ${isActive ? 'active' : ''}" onclick="onChunkCardClicked(${idx})">
+            <span class="chunk-num">${numDisplay}</span>
+            <span class="chunk-text ${isTextMasked ? 'masked' : ''}">${contentStr}</span>
             <span class="chunk-badge">停 ${waitSec}s</span>
           </div>
         `;
       }).join('');
     }
 
-    async function deleteCurrentLesson() {
+    // 手動點擊卡片：變深色框 + 定位 Icon 📍
+    function onChunkCardClicked(idx) {
       if (!currentLesson) return;
-      if (!confirm(`確定要刪除「${currentLesson.title}」嗎？\n(GitHub 上的結構與音檔將會被刪除)`)) return;
-
-      document.getElementById('playerBanner').innerHTML = `<span class="loading-hourglass">⏳</span> 刪除中...`;
-      closeModal('manageLessonModal');
-
-      try {
-        const res = await callGAS('deleteLesson', {
-          payload: { lessonId: currentLesson.id, ghConfig: APP_CONFIG.GITHUB }
-        });
-        lessonsIndex = res.indexList;
-        currentLesson = null;
-        if (lessonsIndex.length === 0) {
-          switchView('ADD');
-        } else {
-          renderCatalogDropdown();
-          await selectLesson(lessonsIndex[0].id);
-        }
-      } catch (e) {
-        alert("刪除失敗: " + e.message);
-      }
-    }
-
-    function playSinglePreview(idx) {
-      if (!currentLesson || !audioBlobUrls[idx]) return;
-      stopDictation();
       ensureIosAudioKeepAlive();
 
+      // 如果正在讀默中，先暫停計時器
+      if (dictation.isRunning) {
+        pauseDictation();
+      }
+
+      selectedActiveIdx = idx;
       dictation.chunkIdx = idx;
-      highlightActiveChunk(idx);
+      dictation.pass = 1;
+
+      renderChunks();
+      scrollChunkIntoView(idx);
 
       const chunk = currentLesson.chunks[idx];
-      const player = document.getElementById('mainAudio');
-      player.src = audioBlobUrls[idx];
-      player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
-      player.onended = null;
-      player.play();
-
-      const label = chunk.isTitle ? "【題目】" : `第 ${chunk.index} 句`;
-      document.getElementById('playerBanner').innerText = `🔊 單句朗讀：${label}`;
+      const label = chunk.isTitle ? "【題目 (T.)】" : `第 ${chunk.index} 句`;
+      document.getElementById('playerBanner').innerText = `👉 已選定：${label} (點擊「開始讀默」由此句開始)`;
     }
 
-    function startOrResumeDictation() {
+    // 開始讀默邏輯
+    function handleStartOrResumeDictation() {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
 
@@ -828,15 +870,23 @@
         return;
       }
 
+      // 若目前無任何卡片 active，由 Title (第0句) 開始；若已手動選定某句，則由該句開始播第1次
+      if (selectedActiveIdx < 0) {
+        selectedActiveIdx = 0;
+        dictation.chunkIdx = 0;
+      } else {
+        dictation.chunkIdx = selectedActiveIdx;
+      }
+
       dictation.isRunning = true;
       dictation.isPaused = false;
-      dictation.chunkIdx = 0;
       dictation.pass = 1;
 
       document.getElementById('btnPlay').disabled = true;
       document.getElementById('btnPause').disabled = false;
-      document.getElementById('btnStop').disabled = false;
+      document.getElementById('btnRestart').disabled = false;
 
+      renderChunks();
       runDictationCycle();
     }
 
@@ -847,17 +897,33 @@
       const total = currentLesson.chunks.length;
       const maxPasses = Number(serverState.settings.repeatCount || 2);
 
+      // 全部播完：Active 跳到 Title (第0句)，然後停播
       if (idx >= total) {
-        stopDictation();
-        document.getElementById('playerBanner').innerText = "🎉 全篇讀默完成！";
+        dictation.isRunning = false;
+        dictation.isPaused = false;
+        clearInterval(dictation.timer);
+
+        selectedActiveIdx = 0;
+        dictation.chunkIdx = 0;
+        dictation.pass = 1;
+
+        renderChunks();
+        scrollChunkIntoView(0);
+
+        document.getElementById('btnPlay').innerText = "▶ 開始讀默";
+        document.getElementById('btnPlay').disabled = false;
+        document.getElementById('btnPause').disabled = true;
+        document.getElementById('playerBanner').innerText = "🎉 全篇讀默完成！已回到 Title";
         return;
       }
 
-      const chunk = currentLesson.chunks[idx];
-      highlightActiveChunk(idx);
+      selectedActiveIdx = idx;
+      renderChunks();
+      scrollChunkIntoView(idx);
 
+      const chunk = currentLesson.chunks[idx];
       const banner = document.getElementById('playerBanner');
-      const label = chunk.isTitle ? "【題目】" : `第 ${chunk.index}/${total - 1} 句`;
+      const label = chunk.isTitle ? "【題目 (T.)】" : `第 ${chunk.index}/${total - 1} 句`;
       banner.innerText = `🔊 朗讀中：${label} (第 ${dictation.pass}/${maxPasses} 次)`;
 
       const player = document.getElementById('mainAudio');
@@ -926,8 +992,26 @@
       btn.innerText = "▶ 開始讀默";
       btn.disabled = !currentLesson;
       document.getElementById('btnPause').disabled = true;
-      document.getElementById('btnStop').disabled = true;
-      highlightActiveChunk(-1);
+    }
+
+    // 重頭開始：由 Title (第0句) 開始讀默
+    function restartFromBeginning() {
+      if (!currentLesson) return;
+      stopDictation();
+      ensureIosAudioKeepAlive();
+
+      selectedActiveIdx = 0;
+      dictation.chunkIdx = 0;
+      dictation.pass = 1;
+      dictation.isRunning = true;
+      dictation.isPaused = false;
+
+      document.getElementById('btnPlay').disabled = true;
+      document.getElementById('btnPause').disabled = false;
+
+      renderChunks();
+      scrollChunkIntoView(0);
+      runDictationCycle();
     }
 
     function replayCurrentChunk() {
@@ -937,28 +1021,54 @@
         dictation.isPaused = false;
         runDictationCycle();
       } else {
-        playSinglePreview(dictation.chunkIdx || 0);
+        const target = selectedActiveIdx >= 0 ? selectedActiveIdx : 0;
+        playSinglePreviewOnly(target);
       }
     }
 
-    function highlightActiveChunk(activeIdx) {
+    function playSinglePreviewOnly(idx) {
+      if (!currentLesson || !audioBlobUrls[idx]) return;
+      ensureIosAudioKeepAlive();
+
+      const player = document.getElementById('mainAudio');
+      player.src = audioBlobUrls[idx];
+      player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
+      player.onended = null;
+      player.play();
+    }
+
+    function scrollChunkIntoView(idx) {
+      const el = document.getElementById(`chunk_row_${idx}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function deleteCurrentLesson() {
       if (!currentLesson) return;
-      currentLesson.chunks.forEach((_, i) => {
-        const el = document.getElementById(`chunk_row_${i}`);
-        if (el) {
-          if (i === activeIdx) {
-            el.classList.add('active');
-            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          } else {
-            el.classList.remove('active');
-          }
+      if (!confirm(`確定要刪除「${currentLesson.title}」嗎？\n(GitHub 上的結構與音檔將會被刪除)`)) return;
+
+      document.getElementById('playerBanner').innerHTML = `<span class="loading-hourglass">⏳</span> 刪除中...`;
+      closeModal('manageLessonModal');
+
+      try {
+        const res = await callGAS('deleteLesson', {
+          payload: { lessonId: currentLesson.id, lessonTitle: currentLesson.title, ghConfig: APP_CONFIG.GITHUB }
+        });
+        lessonsIndex = res.indexList;
+        currentLesson = null;
+        if (lessonsIndex.length === 0) {
+          switchView('ADD');
+        } else {
+          renderCatalogDropdown();
+          await selectLesson(lessonsIndex[0].id);
         }
-      });
+      } catch (e) {
+        alert("刪除失敗: " + e.message);
+      }
     }
 
     /**
      * ========================================================================
-     * 鎖定控制
+     * 鎖定控制與眼睛 Icon 切換
      * ========================================================================
      */
     function isDeviceUnlocked() {
@@ -974,7 +1084,7 @@
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
       }
       updateLockCardUI();
-      updateMaskCheckboxState();
+      updateEyeBtnUI();
     }
 
     function updateLockCardUI() {
@@ -1000,21 +1110,27 @@
       }
     }
 
-    function updateMaskCheckboxState() {
-      const checkbox = document.getElementById('maskTextCheckbox');
-      const lockIcon = document.getElementById('maskLockIndicator');
-      if (!checkbox) return;
+    // 未解鎖時完全隱藏眼睛 Icon，文字強制遮蔽；已解鎖時顯示眼睛 Icon (👁️/🙈)
+    function updateEyeBtnUI() {
+      const eyeBtn = document.getElementById('btnEyeToggle');
+      if (!eyeBtn) return;
 
       const unlocked = isDeviceUnlocked();
       if (!unlocked) {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-        if (lockIcon) lockIcon.style.display = 'inline';
+        eyeBtn.style.display = 'none';
+        isTextMasked = true; // 強制遮蔽
       } else {
-        checkbox.disabled = false;
-        if (lockIcon) lockIcon.style.display = 'none';
+        eyeBtn.style.display = 'inline-flex';
+        eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
       }
+      renderMaskedLessonHeader();
       renderChunks();
+    }
+
+    function toggleMaskWithEye() {
+      if (!isDeviceUnlocked()) return;
+      isTextMasked = !isTextMasked;
+      updateEyeBtnUI();
     }
 
     async function handleLockToggle() {
@@ -1024,7 +1140,7 @@
       if (unlocked) {
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
         updateLockCardUI();
-        updateMaskCheckboxState();
+        updateEyeBtnUI();
       } else {
         const pwd = window.prompt("請輸入解鎖密碼：");
         if (pwd === null || pwd.trim() === '') return;
@@ -1038,7 +1154,7 @@
             serverState.unlockToken = res.unlockToken;
             localStorage.setItem(UNLOCK_STORAGE_KEY, res.unlockToken);
             updateLockCardUI();
-            updateMaskCheckboxState();
+            updateEyeBtnUI();
           } else if (res.lockedOut) {
             alert(`⛔ 密碼錯誤次數過多，請等待 ${res.remainSec} 秒後再試！`);
           } else {
@@ -1054,7 +1170,7 @@
     }
 
     async function handleRevokeAllDevices() {
-      if (!confirm("確定要一鍵鎖定所有裝置嗎？\n（包括本機及所有已解鎖的手機進入系統後都會自動上鎖）")) return;
+      if (!confirm("確定要一鍵鎖定所有裝置嗎？")) return;
 
       const btn = document.getElementById('btnRevokeAllLocks');
       btn.disabled = true;
@@ -1065,7 +1181,7 @@
         serverState.unlockToken = res.unlockToken;
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
         updateLockCardUI();
-        updateMaskCheckboxState();
+        updateEyeBtnUI();
         alert("🔒 已成功鎖定所有裝置！");
       } catch (e) {
         alert("操作失敗: " + e.message);
@@ -1141,15 +1257,10 @@
       document.getElementById('btnKeySubmit').innerText = "儲存並關閉";
     }
 
-    function closeKeyModal() {
-      closeModal('keyModal');
-    }
+    function closeKeyModal() { closeModal('keyModal'); }
 
     async function onKeyModalSubmit() {
-      if (!isKeysDirty) {
-        closeKeyModal();
-        return;
-      }
+      if (!isKeysDirty) { closeKeyModal(); return; }
 
       const btn = document.getElementById('btnKeySubmit');
       btn.disabled = true;
@@ -1177,7 +1288,7 @@
 
     /**
      * ========================================================================
-     * 系統設定 Modal 控制
+     * 系統設定 Modal
      * ========================================================================
      */
     function openSettingsModal() {
@@ -1224,15 +1335,10 @@
       }
     }
 
-    function closeSettingsModal() {
-      closeModal('settingsModal');
-    }
+    function closeSettingsModal() { closeModal('settingsModal'); }
 
     async function onSettingsModalSubmit() {
-      if (!isSettingsDirty) {
-        closeSettingsModal();
-        return;
-      }
+      if (!isSettingsDirty) { closeSettingsModal(); return; }
 
       const btn = document.getElementById('btnSettingsSubmit');
       btn.disabled = true;
@@ -1250,7 +1356,6 @@
       try {
         serverState = await callGAS('saveSettings', { settings: draftSettings });
         closeSettingsModal();
-        // 若切換了語音模型，自動重新加載當前課文的音檔
         if (oldVoice !== serverState.settings.ttsVoice && currentLesson) {
           await selectLesson(currentLesson.id);
         }
