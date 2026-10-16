@@ -157,7 +157,7 @@
       background: #fff;
     }
 
-    /* 播放頁面控制器吸頂置頂 */
+    /* 播放頁面控制器置頂吸頂 */
     .sticky-player-controls {
       position: sticky;
       top: var(--nav-height);
@@ -456,7 +456,6 @@
       transition: width 0.25s ease;
     }
 
-    /* 彈窗遮罩防穿透與鎖定滾動 */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -466,7 +465,7 @@
       align-items: center;
       z-index: 100;
       padding: 14px;
-      touch-action: none; /* 徹底杜絕觸控與滾動穿透 */
+      touch-action: none;
     }
 
     .modal {
@@ -622,7 +621,7 @@
 
   </main>
 
-  <!-- 彈窗 1：選擇課文語音 -->
+  <!-- 彈窗 1：選擇課文語音 (按 config.js 順序排，全下載完隱藏更多按鈕) -->
   <div id="voicePickerModal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
@@ -654,7 +653,6 @@
           <button class="btn btn-outline" style="padding:10px 12px; font-size:0.85rem;" onclick="cancelTitleEdit()">取消</button>
         </div>
 
-        <!-- 下載進度條 -->
         <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
           <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
           <div class="progress-bar-bg" style="margin:0 0 4px 0;">
@@ -662,14 +660,12 @@
           </div>
         </div>
 
-        <!-- 未下載語音列表與一鍵下載全部按鈕 -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0 6px;">
           <label style="margin:0;">未下載語音:</label>
           <button id="btnDownloadAllVoices" class="btn btn-primary" style="padding:5px 10px; font-size:0.8rem;" onclick="downloadAllPendingVoices()">📥 一鍵下載全部</button>
         </div>
         <div id="voicePendingListContainer" style="margin-bottom:14px;"></div>
 
-        <!-- 已下載語音列表 -->
         <label>已下載語音:</label>
         <div id="voiceDownloadedListContainer" style="margin-bottom:16px;"></div>
 
@@ -828,7 +824,6 @@
      * ========================================================================
      */
     window.onload = async function() {
-      // 防止彈窗背景觸控穿透事件
       document.querySelectorAll('.modal-backdrop').forEach(bd => {
         bd.addEventListener('touchmove', (e) => {
           if (e.target === bd) e.preventDefault();
@@ -933,16 +928,18 @@
 
     /**
      * ========================================================================
-     * 課文專屬語音選擇 Modal
+     * 課文專屬語音選擇 Modal (按 config.js 順序排，全下載完成隱藏按鈕)
      * ========================================================================
      */
     function openVoicePickerModal() {
       if (!currentLesson) return;
       const container = document.getElementById('voicePickerList');
       const voicesMap = currentLesson.voices || {};
-      const downloadedVoiceIds = Object.keys(voicesMap).filter(id => voicesMap[id] && voicesMap[id].downloaded);
 
-      if (downloadedVoiceIds.length === 0) {
+      // 按 config.js 中的原始順序排列已下載的語音模型
+      const downloadedVoices = APP_CONFIG.TTS_VOICES.filter(v => voicesMap[v.id] && voicesMap[v.id].downloaded);
+
+      if (downloadedVoices.length === 0) {
         container.innerHTML = `
           <div style="text-align:center; padding:16px 0; color:var(--text-sub); font-size:0.9rem;">
             此課文尚未下載任何語音模型。<br>請先至課文管理下載語音。
@@ -955,25 +952,32 @@
         return;
       }
 
-      const activeVoice = currentLesson.selectedVoice || downloadedVoiceIds[0];
+      const activeVoice = currentLesson.selectedVoice || downloadedVoices[0].id;
 
-      container.innerHTML = downloadedVoiceIds.map(vid => {
-        const isActive = (vid === activeVoice);
+      let html = downloadedVoices.map(v => {
+        const isActive = (v.id === activeVoice);
         return `
-          <div class="voice-pick-item ${isActive ? 'active' : ''}" onclick="selectLessonVoice('${vid}')">
+          <div class="voice-pick-item ${isActive ? 'active' : ''}" onclick="selectLessonVoice('${v.id}')">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="font-size:1.1rem;">${isActive ? '✅' : '⚪'}</span>
-              <span style="font-weight:600; font-size:0.95rem;">${getVoiceFullLabel(vid)}</span>
+              <span style="font-weight:600; font-size:0.95rem;">${v.label}</span>
             </div>
-            <span class="voice-pick-tag">${getShortVoiceName(vid)}</span>
+            <span class="voice-pick-tag">${getShortVoiceName(v.id)}</span>
           </div>
         `;
-      }).join('') + `
-        <button class="btn btn-outline" style="width:100%; margin-top:14px; padding:10px;" onclick="closeModal('voicePickerModal'); openLessonManageModal();">
-          ➕ 下載更多語音模型
-        </button>
-      `;
+      }).join('');
 
+      // 若未下載晒全部 config.js 中的模型，才顯示「下載更多」按鈕
+      const hasMoreToDownload = APP_CONFIG.TTS_VOICES.some(v => !(voicesMap[v.id] && voicesMap[v.id].downloaded));
+      if (hasMoreToDownload) {
+        html += `
+          <button class="btn btn-outline" style="width:100%; margin-top:14px; padding:10px;" onclick="closeModal('voicePickerModal'); openLessonManageModal();">
+            ➕ 下載更多語音模型
+          </button>
+        `;
+      }
+
+      container.innerHTML = html;
       openModal('voicePickerModal');
     }
 
@@ -1516,7 +1520,7 @@
       }).join('');
     }
 
-    // 點擊卡片：單句播放、設為 active，不自動跳下一句
+    // 點擊卡片：單句試聽、變 active，播完即止（不自動跳下一句）
     function onChunkCardClicked(idx) {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
@@ -1567,17 +1571,24 @@
       navigateChunk(nextIdx);
     }
 
+    // 上一句 / 下一句核心切換邏輯
     function navigateChunk(targetIdx) {
       ensureIosAudioKeepAlive();
+
+      clearInterval(dictation.timer);
+      const player = document.getElementById('mainAudio');
+      player.pause();
+      player.onended = null;
+
       selectedActiveIdx = targetIdx;
       dictation.chunkIdx = targetIdx;
       dictation.pass = 1;
+
       renderChunks();
       scrollChunkIntoView(targetIdx);
       updateNavButtonsState();
 
       if (dictation.isRunning) {
-        clearInterval(dictation.timer);
         dictation.isPaused = false;
         document.getElementById('btnPlay').disabled = true;
         document.getElementById('btnPause').disabled = false;
@@ -1756,14 +1767,8 @@
 
     function replayCurrentChunk() {
       if (!currentLesson) return;
-      clearInterval(dictation.timer);
-      if (dictation.isRunning) {
-        dictation.isPaused = false;
-        runDictationCycle();
-      } else {
-        const target = selectedActiveIdx >= 0 ? selectedActiveIdx : 0;
-        onChunkCardClicked(target);
-      }
+      const target = (selectedActiveIdx >= 0) ? selectedActiveIdx : 0;
+      navigateChunk(target);
     }
 
     function scrollChunkIntoView(idx) {
@@ -1970,7 +1975,6 @@
       openModal('keyModal');
     }
 
-    // 點擊已設定標籤：標籤隱藏並替換為輸入框
     function showKeyInput(keyId) {
       const badge = document.getElementById(`key_badge_${keyId}`);
       const wrap = document.getElementById(`key_wrap_${keyId}`);
@@ -2086,19 +2090,19 @@
 
     /**
      * ========================================================================
-     * 通用工具函數 (鎖定滾動防穿透)
+     * 通用工具函數
      * ========================================================================
      */
     function openModal(id) { 
       document.getElementById(id).style.display = 'flex'; 
-      document.body.style.overflow = 'hidden'; // 鎖定底層滾動
+      document.body.style.overflow = 'hidden';
     }
 
     function closeModal(id) { 
       document.getElementById(id).style.display = 'none'; 
       const anyOpen = Array.from(document.querySelectorAll('.modal-backdrop')).some(el => el.style.display === 'flex');
       if (!anyOpen) {
-        document.body.style.overflow = ''; // 還原滾動
+        document.body.style.overflow = '';
       }
     }
 
