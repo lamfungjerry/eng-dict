@@ -4,8 +4,429 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>英文智能讀默</title>
-  <link rel="stylesheet" href="style.css">
   <script src="config.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-sub: #64748b;
+      --border: #cbd5e1;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang HK", sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+    }
+
+    @keyframes spinHourglass {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(180deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-hourglass {
+      display: inline-block;
+      animation: spinHourglass 1.8s infinite ease-in-out;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .app-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--primary);
+    }
+
+    .icon-btn {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 1.25rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .icon-btn:active { background: #f1f5f9; }
+
+    .dot-badge {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 9px;
+      height: 9px;
+      background-color: var(--danger);
+      border-radius: 50%;
+      border: 2px solid #fff;
+    }
+
+    .container {
+      max-width: 520px;
+      margin: 12px auto;
+      padding: 0 12px 40px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      margin-bottom: 14px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .big-upload-btn {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 16px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.02rem;
+      border-radius: 12px;
+      cursor: pointer;
+      border: none;
+      text-align: center;
+    }
+
+    .big-upload-btn:active { background: #1d4ed8; }
+
+    .lesson-select-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .masked-lesson-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      height: 44px;
+      padding: 0 10px;
+      background: #f8fafc;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .player-status-row {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+    }
+
+    .voice-switch-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .voice-switch-badge:active { background: #dbeafe; }
+
+    /* 黑色膠帶遮蔽圖層 */
+    .chunk-text.masked {
+      background-color: #000000 !important;
+      color: #000000 !important;
+      border-radius: 3px;
+      padding: 0 4px;
+      user-select: none;
+      display: inline-block;
+      line-height: 1.35;
+      letter-spacing: 0.5px;
+    }
+
+    /* 序號/定位Icon固定寬度 (以99.為基準) */
+    .chunk-num {
+      display: inline-block;
+      width: 32px;
+      text-align: right;
+      margin-right: 8px;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: var(--text-main);
+    }
+
+    .chunk-card {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+
+    .chunk-card.active {
+      border-color: #1e3a8a !important;
+      border-width: 2px;
+      background: #eff6ff;
+    }
+
+    .chunk-badge {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* 2x2 卡片排版 */
+    .stepper-cards-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 14px 0 10px;
+    }
+
+    .stepper-mini-card {
+      background: #f8fafc;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 4px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stepper-mini-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .stepper-control {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      width: 100%;
+    }
+
+    .stepper-btn {
+      width: 34px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .stepper-btn:active { background: #eff6ff; }
+
+    .stepper-display {
+      width: 52px;
+      height: 36px;
+      text-align: center;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text-main);
+      outline: none;
+      padding: 0;
+    }
+
+    .stepper-mini-card.lock-card { border-width: 2px; }
+    .stepper-mini-card.lock-card.is-locked { background: #fef2f2; border-color: #ef4444; }
+    .stepper-mini-card.lock-card.is-unlocked { background: #f0fdf4; border-color: #22c55e; }
+
+    .lock-action-btn {
+      width: 90%;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lock-action-btn.btn-to-unlock { background: #ef4444; color: #fff; }
+    .lock-action-btn.btn-to-lock   { background: #16a34a; color: #fff; }
+
+    .btn-lock-all-devices {
+      width: 100%;
+      margin-bottom: 10px;
+      background: #fff1f2;
+      color: #e11d48;
+      border: 1.5px solid #fecdd3;
+      padding: 11px 16px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .voice-manage-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      background: #fff;
+    }
+
+    .voice-manage-info { display: flex; flex-direction: column; }
+    .voice-manage-name { font-size: 0.9rem; font-weight: 600; }
+    .voice-manage-status { font-size: 0.76rem; color: var(--text-sub); margin-top: 2px; }
+
+    label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin: 10px 0 6px;
+    }
+
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+
+    .btn {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: none;
+      font-size: 0.96rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn:active { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-success { background: var(--success); }
+    .btn-warning { background: var(--warning); }
+    .btn-danger  { background: var(--danger); }
+    .btn-outline {
+      background: #fff;
+      color: var(--text-main);
+      border: 1.5px solid var(--border);
+    }
+
+    .modal-close-btn {
+      width: 40px;
+      height: 40px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      padding: 14px;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      max-width: 460px;
+      width: 100%;
+      padding: 18px;
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+  </style>
 </head>
 <body>
 
@@ -70,11 +491,9 @@
     <section id="viewPlayer" class="card" style="display:none;">
       <!-- 課文列：選定後遮蔽標題 + ↩️返回重選按鈕 + ➕加入按鈕 + 📋管理按鈕 -->
       <div id="catalogBar" class="lesson-select-bar">
-        <!-- 挑選中模式 -->
         <div id="lessonPickerBox" style="flex:1; display:none;">
-          <select id="lessonDropdown" onchange="onSelectLessonDropdown(this.value)"></select>
+          <select id="lessonDropdown" onchange="onSelectLessonFromDropdown(this.value)"></select>
         </div>
-        <!-- 已選定模式 (遮蔽課文標題) -->
         <div id="lessonChosenBox" style="flex:1; display:flex; align-items:center; gap:8px;">
           <button class="icon-btn" onclick="showLessonDropdownPicker()" title="重新揀選課文">↩️</button>
           <div id="maskedLessonHeader" class="masked-lesson-box"></div>
@@ -289,7 +708,6 @@
       return `${padded}_${sanitizeFileName(text)}.mp3`;
     }
 
-    // 黑色膠帶遮蔽：英文字母替換為 X (大寫) 與 x (小寫)
     function maskEnglishChars(str) {
       return escapeHtml(String(str).replace(/[A-Z]/g, 'X').replace(/[a-z]/g, 'x').replace(/[0-9]/g, 'X'));
     }
@@ -489,7 +907,6 @@
       });
     }
 
-    // 課文選取器顯示切換 (選定後遮蔽標題 + 返回按鈕)
     function showLessonDropdownPicker() {
       document.getElementById('lessonPickerBox').style.display = 'block';
       document.getElementById('lessonChosenBox').style.display = 'none';
@@ -511,8 +928,8 @@
       }
     }
 
-    function onSelectLessonFromDropdown(id) {
-      selectLesson(id);
+    function onSelectLessonFromDropdown(folderName) {
+      selectLesson(folderName);
     }
 
     /**
@@ -554,7 +971,7 @@
         currentLesson = data.lesson;
         renderCatalogDropdown();
         switchView('PLAYER');
-        await selectLesson(currentLesson.id);
+        await selectLesson(currentLesson.folderName);
 
         openLessonManageModal();
 
@@ -618,7 +1035,7 @@
 
       try {
         const data = await callGAS('updateLessonTitle', {
-          payload: { lessonId: currentLesson.id, newTitle: newTitle, ghConfig: APP_CONFIG.GITHUB }
+          payload: { oldFolderName: currentLesson.folderName, newTitle: newTitle, ghConfig: APP_CONFIG.GITHUB }
         });
         currentLesson = data.lesson;
         lessonsIndex = data.indexList;
@@ -657,8 +1074,7 @@
 
           const res = await callGAS('step2_downloadVoiceBatch', {
             payload: {
-              lessonId: currentLesson.id,
-              lessonTitle: currentLesson.title,
+              folderName: currentLesson.folderName,
               voiceName: voiceId,
               batchChunks: batch,
               ghConfig: APP_CONFIG.GITHUB
@@ -673,7 +1089,7 @@
 
         const commitRes = await callGAS('step3_commitVoiceBlobs', {
           payload: {
-            lessonId: currentLesson.id,
+            folderName: currentLesson.folderName,
             voiceName: voiceId,
             allVoiceBlobs: allVoiceBlobs,
             ghConfig: APP_CONFIG.GITHUB
@@ -687,7 +1103,7 @@
         progBox.style.display = 'none';
 
         if (serverState.settings.ttsVoice === voiceId) {
-          await selectLesson(currentLesson.id);
+          await selectLesson(currentLesson.folderName);
         }
         alert(`✅ 語音模型「${getShortVoiceName(voiceId)}」已成功下載！`);
 
@@ -699,7 +1115,7 @@
 
     /**
      * ========================================================================
-     * 課文播放引擎
+     * 課文播放引擎 (路徑為 {課文Title}/{語音模型}/{000_text.mp3})
      * ========================================================================
      */
     function getRawUrl(path) {
@@ -714,7 +1130,7 @@
 
     async function loadCatalogFromGitHub() {
       try {
-        const res = await fetch(getRawUrl('lessons/index.json'));
+        const res = await fetch(getRawUrl('index.json'));
         lessonsIndex = res.ok ? await res.json() : [];
       } catch (e) {
         lessonsIndex = [];
@@ -725,35 +1141,34 @@
       } else {
         renderCatalogDropdown();
         switchView('PLAYER');
-        await selectLesson(lessonsIndex[0].id);
+        await selectLesson(lessonsIndex[0].folderName);
       }
     }
 
     function renderCatalogDropdown() {
       const sel = document.getElementById('lessonDropdown');
       sel.innerHTML = lessonsIndex.map(item => `
-        <option value="${item.id}" ${currentLesson && currentLesson.id === item.id ? 'selected' : ''}>
+        <option value="${item.folderName}" ${currentLesson && currentLesson.folderName === item.folderName ? 'selected' : ''}>
           ${escapeHtml(item.title)}
         </option>
       `).join('');
     }
 
-    async function selectLesson(lessonId) {
+    async function selectLesson(folderName) {
       stopDictation();
-      selectedActiveIdx = -1; // 重置 Active 卡片
+      selectedActiveIdx = -1;
 
       const banner = document.getElementById('playerBanner');
       banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔中...`;
       document.getElementById('btnPlay').disabled = true;
       document.getElementById('btnRestart').disabled = true;
 
-      // 預設為隱藏文字
       isTextMasked = true;
       updateEyeBtnUI();
       updateVoiceBadge();
 
       try {
-        const res = await fetch(getRawUrl(`lessons/lesson_${lessonId}.json`));
+        const res = await fetch(getRawUrl(`${folderName}/lesson.json`));
         if (!res.ok) throw new Error("讀取失敗");
         currentLesson = await res.json();
 
@@ -768,11 +1183,11 @@
         let loaded = 0;
         const total = currentLesson.chunks.length;
 
-        // 音檔結構與 Google Drive 100% 一致: eng-dict/{課文名}/{語音名}/{000_text.mp3}
+        // GitHub-assets 路徑: {課文Title}/{語音模型}/{000_text.mp3}
         await Promise.all(currentLesson.chunks.map(async (chunk) => {
           let blobUrl = null;
           const fileName = getDriveMp3Name(chunk.index, chunk.text);
-          const audioPath = `eng-dict/${sanitizeFileName(currentLesson.title)}/${voiceName}/${fileName}`;
+          const audioPath = `${currentLesson.folderName}/${voiceName}/${fileName}`;
 
           try {
             const r = await fetch(getCdnUrl(audioPath));
@@ -785,7 +1200,7 @@
           if (!blobUrl) {
             const fb = await callGAS('fallbackGetAudio', {
               payload: {
-                lessonTitle: currentLesson.title,
+                folderName: currentLesson.folderName,
                 voiceName: voiceName,
                 chunk: chunk
               }
@@ -808,7 +1223,6 @@
       }
     }
 
-    // 渲染卡片 (固定寬度序號/定位Icon + 黑色膠帶遮蔽)
     function renderChunks() {
       const cont = document.getElementById('chunkListContainer');
       if (!currentLesson) { cont.innerHTML = ''; return; }
@@ -819,7 +1233,6 @@
         const waitSec = Math.max(1, Math.round(c.pauseSeconds * mult));
         const isActive = (selectedActiveIdx === idx);
 
-        // Active 時序號變成定位 Icon 📍；非 Active 時顯示 T. 或 數字.
         let numLabel = c.isTitle ? "T." : `${c.index}.`;
         let numDisplay = isActive ? "📍" : numLabel;
 
@@ -835,12 +1248,10 @@
       }).join('');
     }
 
-    // 手動點擊卡片：變深色框 + 定位 Icon 📍
     function onChunkCardClicked(idx) {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
 
-      // 如果正在讀默中，先暫停計時器
       if (dictation.isRunning) {
         pauseDictation();
       }
@@ -857,7 +1268,6 @@
       document.getElementById('playerBanner').innerText = `👉 已選定：${label} (點擊「開始讀默」由此句開始)`;
     }
 
-    // 開始讀默邏輯
     function handleStartOrResumeDictation() {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
@@ -870,7 +1280,6 @@
         return;
       }
 
-      // 若目前無任何卡片 active，由 Title (第0句) 開始；若已手動選定某句，則由該句開始播第1次
       if (selectedActiveIdx < 0) {
         selectedActiveIdx = 0;
         dictation.chunkIdx = 0;
@@ -897,7 +1306,7 @@
       const total = currentLesson.chunks.length;
       const maxPasses = Number(serverState.settings.repeatCount || 2);
 
-      // 全部播完：Active 跳到 Title (第0句)，然後停播
+      // 全部播完：回到 Title (第0句) 並停播
       if (idx >= total) {
         dictation.isRunning = false;
         dictation.isPaused = false;
@@ -994,7 +1403,6 @@
       document.getElementById('btnPause').disabled = true;
     }
 
-    // 重頭開始：由 Title (第0句) 開始讀默
     function restartFromBeginning() {
       if (!currentLesson) return;
       stopDictation();
@@ -1051,7 +1459,7 @@
 
       try {
         const res = await callGAS('deleteLesson', {
-          payload: { lessonId: currentLesson.id, lessonTitle: currentLesson.title, ghConfig: APP_CONFIG.GITHUB }
+          payload: { folderName: currentLesson.folderName, ghConfig: APP_CONFIG.GITHUB }
         });
         lessonsIndex = res.indexList;
         currentLesson = null;
@@ -1059,7 +1467,7 @@
           switchView('ADD');
         } else {
           renderCatalogDropdown();
-          await selectLesson(lessonsIndex[0].id);
+          await selectLesson(lessonsIndex[0].folderName);
         }
       } catch (e) {
         alert("刪除失敗: " + e.message);
@@ -1068,7 +1476,7 @@
 
     /**
      * ========================================================================
-     * 鎖定控制與眼睛 Icon 切換
+     * 鎖定控制與眼睛 Icon
      * ========================================================================
      */
     function isDeviceUnlocked() {
@@ -1110,7 +1518,6 @@
       }
     }
 
-    // 未解鎖時完全隱藏眼睛 Icon，文字強制遮蔽；已解鎖時顯示眼睛 Icon (👁️/🙈)
     function updateEyeBtnUI() {
       const eyeBtn = document.getElementById('btnEyeToggle');
       if (!eyeBtn) return;
@@ -1118,7 +1525,7 @@
       const unlocked = isDeviceUnlocked();
       if (!unlocked) {
         eyeBtn.style.display = 'none';
-        isTextMasked = true; // 強制遮蔽
+        isTextMasked = true;
       } else {
         eyeBtn.style.display = 'inline-flex';
         eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
@@ -1213,10 +1620,10 @@
         const isSet = Boolean(serverState.keyStatus && serverState.keyStatus[k.id]);
         if (isSet) {
           return `
-            <div class="key-item">
-              <div class="key-title">${k.name}</div>
+            <div style="border-bottom:1px solid var(--border); padding:12px 0;">
+              <div style="font-size:0.92rem; font-weight:600;">${k.name}</div>
               <div style="margin-top:6px;" onclick="toggleKeyInputBox('${k.id}')">
-                <span class="badge-tag ok">✅ 已設定 (點擊修改)</span>
+                <span style="font-size:0.76rem; padding:4px 10px; border-radius:6px; font-weight:600; display:inline-block; background:#dcfce7; color:var(--success);">✅ 已設定 (點擊修改)</span>
               </div>
               <div id="key_wrap_${k.id}" style="display:none; margin-top:8px;">
                 <input type="password" id="key_input_${k.id}" placeholder="輸入新金鑰以覆蓋" oninput="markKeysDirty()">
@@ -1225,10 +1632,10 @@
           `;
         } else {
           return `
-            <div class="key-item">
-              <div class="key-row-inline">
-                <span class="key-title">${k.name}</span>
-                <span class="badge-tag warn">⚠️ 尚未設定</span>
+            <div style="border-bottom:1px solid var(--border); padding:12px 0;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.92rem; font-weight:600;">${k.name}</span>
+                <span style="font-size:0.76rem; padding:4px 10px; border-radius:6px; font-weight:600; display:inline-block; background:#fee2e2; color:var(--danger);">⚠️ 尚未設定</span>
               </div>
               <div style="margin-top:8px;">
                 <input type="password" id="key_input_${k.id}" placeholder="請貼上 ${k.name}" oninput="markKeysDirty()">
@@ -1288,7 +1695,7 @@
 
     /**
      * ========================================================================
-     * 系統設定 Modal
+     * 系統設定 Modal 控制
      * ========================================================================
      */
     function openSettingsModal() {
@@ -1357,7 +1764,7 @@
         serverState = await callGAS('saveSettings', { settings: draftSettings });
         closeSettingsModal();
         if (oldVoice !== serverState.settings.ttsVoice && currentLesson) {
-          await selectLesson(currentLesson.id);
+          await selectLesson(currentLesson.folderName);
         }
       } catch (e) {
         alert("儲存設定失敗: " + e.message);
