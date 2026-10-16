@@ -43,7 +43,7 @@
       </div>
     </div>
 
-    <!-- 視圖 A：【加入課文介面】 (無課文時自動顯示；有課文時互斥隱藏) -->
+    <!-- 視圖 A：【加入課文介面】 -->
     <section id="viewAddLesson" class="card" style="display:none;">
       <div class="card-header">
         <h2 class="card-title">✨ 加入新課文</h2>
@@ -51,7 +51,6 @@
       </div>
 
       <div id="addFormArea">
-        <!-- 上方操作行：加大上傳按鈕 + 複製 Prompt 小按鈕 -->
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
           <label for="ocrImageInput" class="big-upload-btn">
             📷 拍攝或選取相片
@@ -63,13 +62,11 @@
           </button>
         </div>
 
-        <!-- 已選相片標籤 -->
         <div id="selectedImageHint" style="display:none; margin-bottom:12px; padding:10px 12px; background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px; font-size:0.86rem; justify-content:space-between; align-items:center;">
           <span id="selectedImageName" style="color:#166534; font-weight:700;"></span>
           <button type="button" class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem;" onclick="clearSelectedImage()">✕ 移除</button>
         </div>
 
-        <!-- 外部 JSON 貼上區 -->
         <label style="margin-top:6px;">貼上外部 AI 分析的 JSON (選填):</label>
         <textarea id="jsonInputText" rows="6" placeholder="如 Gemini 額度忙碌，可複製 Prompt 給其他 AI 分析，並將輸出的純 JSON 貼於此處..." oninput="validateInputState()"></textarea>
         <div id="jsonValidHint" style="font-size:0.82rem; margin-top:4px; font-weight:600; display:none;"></div>
@@ -79,7 +76,6 @@
         </button>
       </div>
 
-      <!-- 進度區塊 -->
       <div id="buildProgressArea" class="progress-box" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span id="progStepPill" style="background:var(--primary); color:#fff; font-size:0.75rem; font-weight:700; padding:3px 8px; border-radius:6px;">Step 1 / 3</span>
@@ -115,8 +111,9 @@
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0;">
         <div id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</div>
+        <!-- 預設勾選隱藏文字 (checked) -->
         <label style="margin:0; font-size:0.84rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-          <input type="checkbox" id="maskTextCheckbox" onchange="renderChunks()"> 🙈 隱藏文字
+          <input type="checkbox" id="maskTextCheckbox" onchange="renderChunks()" checked> 🙈 隱藏文字
         </label>
       </div>
 
@@ -149,7 +146,7 @@
     </div>
   </div>
 
-  <!-- 右上：系統設定 Modal (左右卡片式步進器) -->
+  <!-- 右上：系統設定 Modal -->
   <div id="settingsModal" class="modal-backdrop">
     <div class="modal">
       <div class="card-header">
@@ -157,7 +154,6 @@
         <button class="modal-close-btn" onclick="closeSettingsModal()">✕</button>
       </div>
 
-      <!-- 6. 語音模型：下拉式分開 Azure 與 Google -->
       <label>語音模型:</label>
       <select id="setVoiceSelect" style="margin-bottom:10px;" onchange="markSettingsDirty()">
         <optgroup label="Microsoft Azure">
@@ -183,9 +179,7 @@
         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
       </select>
 
-      <!-- 5. 播放語速、朗讀次數、停頓倍率：左右卡片式排版 -->
       <div class="stepper-cards-row">
-        <!-- 卡片 1: 播放語速 -->
         <div class="stepper-mini-card">
           <div class="stepper-mini-title">播放語速</div>
           <div class="stepper-control">
@@ -195,7 +189,6 @@
           </div>
         </div>
 
-        <!-- 卡片 2: 朗讀次數 -->
         <div class="stepper-mini-card">
           <div class="stepper-mini-title">朗讀次數</div>
           <div class="stepper-control">
@@ -205,7 +198,6 @@
           </div>
         </div>
 
-        <!-- 卡片 3: 停頓倍率 -->
         <div class="stepper-mini-card">
           <div class="stepper-mini-title">停頓倍率</div>
           <div class="stepper-control">
@@ -377,7 +369,6 @@
       validateInputState();
     }
 
-    // 3. 智能驗證：留空取圖片，貼 JSON 則先驗證格式，無任何內容則鎖定按鈕
     function validateInputState() {
       const jsonText = document.getElementById('jsonInputText').value.trim();
       const hasImage = Boolean(document.getElementById('ocrImageInput').files.length > 0);
@@ -412,7 +403,6 @@
       btnStart.disabled = !hasImage;
     }
 
-    // 2. 複製 .gs 的 Prompt 給使用者自行找 AI
     function copySystemPrompt() {
       const promptText = serverState.systemPrompt || "請將課文以小學生英文讀默為目標分拆為意群純 JSON 格式。";
       navigator.clipboard.writeText(promptText).then(() => {
@@ -497,7 +487,7 @@
       await callGAS('discardPendingTask');
     }
 
-// 核心斷點續傳執行器：每次循環即時讀取最新狀態，精準同步進度條
+    // 斷點續傳執行器：即時同步進度數字
     async function continuePipelineFromCheckpoint() {
       if (!activeTaskState) return;
       document.getElementById('btnResumeOnError').style.display = 'none';
@@ -507,19 +497,16 @@
         const batchSize = APP_CONFIG.TTS_BATCH_SIZE || 5;
 
         for (let i = 0; i < total; i += batchSize) {
-          // 每次循環都動態讀取當前最新的 chunks 陣列，避免讀取舊變數
           const currentChunks = activeTaskState.chunks;
           const slice = currentChunks.slice(i, i + batchSize);
           const needsWork = slice.some(c => !c.driveFileId || !c.gitBlobSha);
 
           if (needsWork) {
-            // 計算當前真正已完成的句數
             const doneSoFar = currentChunks.filter(c => c.driveFileId && c.gitBlobSha).length;
             const batchIndices = slice.map(c => c.index);
             const startNum = batchIndices[0] + 1;
             const endNum = batchIndices[batchIndices.length - 1] + 1;
 
-            // 即時同步顯示：正在處理哪幾句，以及目前已完成/尚餘的真實數字
             renderProgressUI(
               2, 3,
               activeTaskState.title,
@@ -536,7 +523,6 @@
               }
             });
 
-            // 立即將後端回傳的最新進度狀態覆蓋進 activeTaskState
             if (step2Res.updatedFullState) {
               activeTaskState = step2Res.updatedFullState;
             }
@@ -545,7 +531,6 @@
               throw new Error(step2Res.error || "處理中斷");
             }
 
-            // 本批次完成後，立刻推進進度條與百分比
             const updatedDone = activeTaskState.chunks.filter(c => c.driveFileId && c.gitBlobSha).length;
             renderProgressUI(
               2, 3,
@@ -557,7 +542,6 @@
           }
         }
 
-        // 所有批次完成，進入 Step 3 單次打包 Commit
         renderProgressUI(3, 3, activeTaskState.title, "正在同步課文清單...", total, total);
 
         const step3Res = await callGAS('step3_commitToGitHub', {
@@ -623,11 +607,12 @@
       }
     }
 
+    // 課文下拉選單：移除組數顯示
     function renderCatalogDropdown() {
       const sel = document.getElementById('lessonDropdown');
       sel.innerHTML = lessonsIndex.map(item => `
         <option value="${item.id}" ${currentLesson && currentLesson.id === item.id ? 'selected' : ''}>
-          ${escapeHtml(item.title)} (${item.chunkCount}組)
+          ${escapeHtml(item.title)}
         </option>
       `).join('');
     }
@@ -678,7 +663,7 @@
           banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔中 (${loaded}/${total})...`;
         }));
 
-        banner.innerText = `✅ 已準備就緒 (共 ${total} 組)`;
+        banner.innerText = `✅ 已準備就緒`;
         document.getElementById('btnPlay').disabled = false;
         document.getElementById('btnReplay').disabled = false;
 
@@ -687,6 +672,7 @@
       }
     }
 
+    // 意群清單：區分題目與一般句子
     function renderChunks() {
       const cont = document.getElementById('chunkListContainer');
       if (!currentLesson) { cont.innerHTML = ''; return; }
@@ -697,9 +683,10 @@
       cont.innerHTML = currentLesson.chunks.map((c, idx) => {
         const waitSec = Math.max(1, Math.round(c.pauseSeconds * mult));
         const isActive = dictation.isRunning && dictation.chunkIdx === idx;
+        const displayText = c.isTitle ? `📌 題目：${escapeHtml(c.text)}` : `${c.index}. ${escapeHtml(c.text)}`;
         return `
           <div id="chunk_row_${idx}" class="chunk-card ${isActive ? 'active' : ''}" onclick="playSinglePreview(${idx})">
-            <span class="chunk-text ${isMasked ? 'masked' : ''}">${idx + 1}. ${escapeHtml(c.text)}</span>
+            <span class="chunk-text ${isMasked ? 'masked' : ''}">${displayText}</span>
             <span class="chunk-badge">停 ${waitSec}s</span>
           </div>
         `;
@@ -736,12 +723,15 @@
       dictation.chunkIdx = idx;
       highlightActiveChunk(idx);
 
+      const chunk = currentLesson.chunks[idx];
       const player = document.getElementById('mainAudio');
       player.src = audioBlobUrls[idx];
       player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
       player.onended = null;
       player.play();
-      document.getElementById('playerBanner').innerText = `🔊 單句朗讀：第 ${idx + 1} 組`;
+
+      const label = chunk.isTitle ? "【題目】" : `第 ${chunk.index} 句`;
+      document.getElementById('playerBanner').innerText = `🔊 單句朗讀：${label}`;
     }
 
     function startOrResumeDictation() {
@@ -785,7 +775,8 @@
       highlightActiveChunk(idx);
 
       const banner = document.getElementById('playerBanner');
-      banner.innerText = `🔊 第 ${idx + 1}/${total} 組 (第 ${dictation.pass}/${maxPasses} 次)`;
+      const label = chunk.isTitle ? "【題目】" : `第 ${chunk.index}/${total - 1} 句`;
+      banner.innerText = `🔊 朗讀中：${label} (第 ${dictation.pass}/${maxPasses} 次)`;
 
       const player = document.getElementById('mainAudio');
       player.src = audioBlobUrls[idx];
@@ -796,7 +787,8 @@
 
         const mult = Number(serverState.settings.pauseMultiplier || 1.0);
         let remain = Math.max(1, Math.round(chunk.pauseSeconds * mult));
-        banner.innerText = `✍️ 默寫停頓中... (${remain} 秒)`;
+        const waitLabel = chunk.isTitle ? "請默寫題目..." : `默寫停頓中...`;
+        banner.innerText = `✍️ ${waitLabel} (${remain} 秒)`;
 
         clearInterval(dictation.timer);
         dictation.timer = setInterval(() => {
@@ -806,7 +798,7 @@
           }
           remain--;
           if (remain > 0) {
-            banner.innerText = `✍️ 默寫停頓中... (${remain} 秒)`;
+            banner.innerText = `✍️ ${waitLabel} (${remain} 秒)`;
           } else {
             clearInterval(dictation.timer);
             if (dictation.pass < maxPasses) {
@@ -884,7 +876,7 @@
 
     /**
      * ========================================================================
-     * 4. Key 設定 Modal (無更動顯示「關閉」，有修改顯示「儲存並關閉」)
+     * Key Modal 控制
      * ========================================================================
      */
     function openKeyModal() {
@@ -983,7 +975,7 @@
 
     /**
      * ========================================================================
-     * 4. 系統設定 Modal (無更動顯示「關閉」，有修改顯示「儲存並關閉」)
+     * 系統設定 Modal 控制
      * ========================================================================
      */
     function openSettingsModal() {
@@ -1063,7 +1055,7 @@
 
     /**
      * ========================================================================
-     * 工具函數
+     * 通用工具函數
      * ========================================================================
      */
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
