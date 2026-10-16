@@ -1,6 +1,5 @@
 :root {
   --primary: #2563eb;
-  --primary-hover: #1d4ed8;
   --success: #16a34a;
   --warning: #d97706;
   --danger: #dc2626;
@@ -8,7 +7,7 @@
   --card-bg: #ffffff;
   --text-main: #1e293b;
   --text-sub: #64748b;
-  --border: #e2e8f0;
+  --border: #cbd5e1;
 }
 
 * {
@@ -22,6 +21,20 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang HK", sans-serif;
   background-color: var(--bg);
   color: var(--text-main);
+}
+
+/* 旋轉漏斗動畫 (所有 Loading / 處理中畫面使用) */
+@keyframes spinHourglass {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-hourglass {
+  display: inline-block;
+  animation: spinHourglass 1.8s infinite ease-in-out;
+  margin-right: 6px;
+  vertical-align: middle;
 }
 
 /* 頂部導覽列 (純 Icon) */
@@ -46,15 +59,15 @@ body {
 
 .icon-btn {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
   background: #fff;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   cursor: pointer;
 }
 
@@ -62,11 +75,10 @@ body {
   background: #f1f5f9;
 }
 
-/* 提示紅點 */
 .dot-badge {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 5px;
+  right: 5px;
   width: 9px;
   height: 9px;
   background-color: var(--danger);
@@ -74,17 +86,16 @@ body {
   border: 2px solid #fff;
 }
 
-/* 主容器 */
 .container {
-  max-width: 600px;
+  max-width: 520px;
   margin: 12px auto;
-  padding: 0 14px 40px;
+  padding: 0 12px 40px;
 }
 
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.03);
   margin-bottom: 14px;
@@ -103,34 +114,71 @@ body {
   margin: 0;
 }
 
-/* 步進器 Stepper [-] [input] [+] */
-.stepper-group {
-  margin-bottom: 14px;
+/* 加大圖片上傳按鈕 */
+.big-upload-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.02rem;
+  border-radius: 12px;
+  cursor: pointer;
+  border: none;
+  text-align: center;
 }
 
-.stepper-label {
-  font-size: 0.88rem;
-  font-weight: 600;
-  margin-bottom: 6px;
+.big-upload-btn:active {
+  background: #1d4ed8;
+}
+
+/* 步進器左右卡片式容器 */
+.stepper-cards-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.stepper-mini-card {
+  background: #f8fafc;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 4px;
+  text-align: center;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.stepper {
+.stepper-mini-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.stepper-control {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 4px;
+  width: 100%;
 }
 
 .stepper-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  width: 32px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
   background: #fff;
-  font-size: 1.4rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 700;
   color: var(--primary);
   display: flex;
   align-items: center;
@@ -140,23 +188,23 @@ body {
 
 .stepper-btn:active {
   background: #eff6ff;
-  border-color: var(--primary);
 }
 
 .stepper-display {
-  width: 100px;
-  height: 44px;
+  width: 48px;
+  height: 36px;
   text-align: center;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #f8fafc;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
   color: var(--text-main);
   outline: none;
+  padding: 0;
 }
 
-/* 按鈕與表單 */
+/* 表單與通用按鈕 */
 label {
   display: block;
   font-size: 0.88rem;
@@ -166,9 +214,9 @@ label {
 
 input[type="text"], input[type="password"], textarea, select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 11px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
   font-size: 0.95rem;
   background: #fff;
 }
@@ -179,28 +227,26 @@ input[type="text"], input[type="password"], textarea, select {
   align-items: center;
   gap: 6px;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: none;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.96rem;
+  font-weight: 700;
   cursor: pointer;
   background: var(--primary);
   color: #fff;
-  transition: opacity 0.15s;
 }
 
 .btn:active { opacity: 0.85; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-success { background: var(--success); }
 .btn-warning { background: var(--warning); }
 .btn-danger  { background: var(--danger); }
 .btn-outline {
   background: #fff;
   color: var(--text-main);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
 }
 
-/* 課文目錄抽屜卡片 */
 .lesson-select-bar {
   display: flex;
   align-items: center;
@@ -213,7 +259,30 @@ input[type="text"], input[type="password"], textarea, select {
   font-weight: 600;
 }
 
-/* 意群清單 */
+.progress-box {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 10px;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 12px;
+  background: #dbeafe;
+  border-radius: 99px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--primary);
+  transition: width 0.25s ease;
+}
+
 .chunk-grid {
   display: flex;
   flex-direction: column;
@@ -226,9 +295,10 @@ input[type="text"], input[type="password"], textarea, select {
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
   background: #fff;
+  cursor: pointer;
 }
 
 .chunk-card.active {
@@ -243,77 +313,66 @@ input[type="text"], input[type="password"], textarea, select {
 }
 
 .chunk-badge {
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   color: var(--text-sub);
   background: #f1f5f9;
-  padding: 3px 6px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-left: 8px;
+  white-space: nowrap;
 }
 
-/* 進度條 */
-.progress-box {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  padding: 14px;
-  margin-top: 12px;
-}
-
-.progress-bar-bg {
-  width: 100%;
-  height: 12px;
-  background: #dbeafe;
-  border-radius: 99px;
-  overflow: hidden;
-  margin: 8px 0;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--primary);
-  transition: width 0.25s ease;
-}
-
-/* Key Modal 特殊排版 */
-.key-block {
+.key-item {
   border-bottom: 1px solid var(--border);
   padding: 12px 0;
 }
 
-.key-block:last-child {
+.key-item:last-child {
   border-bottom: none;
 }
 
-.key-header-row {
+.key-row-inline {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .key-title {
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 600;
-}
-
-.key-sub-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 6px;
 }
 
 .badge-tag {
-  font-size: 0.75rem;
-  padding: 3px 8px;
+  font-size: 0.76rem;
+  padding: 4px 10px;
   border-radius: 6px;
   font-weight: 600;
+  display: inline-block;
 }
 
 .badge-tag.ok { background: #dcfce7; color: var(--success); }
 .badge-tag.warn { background: #fee2e2; color: var(--danger); }
 
-/* Modal 基礎 */
+/* 加大且有框的 Modal 右上關閉按鈕 */
+.modal-close-btn {
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.modal-close-btn:active {
+  background: #f1f5f9;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -327,7 +386,7 @@ input[type="text"], input[type="password"], textarea, select {
 
 .modal {
   background: #fff;
-  border-radius: 14px;
+  border-radius: 16px;
   max-width: 440px;
   width: 100%;
   padding: 18px;
