@@ -145,18 +145,21 @@
       margin-bottom: 12px;
     }
 
-    .masked-lesson-box {
+    /* 揀好課文後的純淨空白容器 (無黑色方塊) */
+    .blank-lesson-box {
       flex: 1;
       display: flex;
       align-items: center;
-      overflow: hidden;
       height: 44px;
-      padding: 0 10px;
+      padding: 0 12px;
       background: #f8fafc;
       border: 1.5px solid var(--border);
       border-radius: 10px;
       font-weight: 700;
       font-size: 0.95rem;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     .player-status-row {
@@ -181,7 +184,7 @@
 
     .voice-switch-badge:active { background: #dbeafe; }
 
-    /* 黑色膠帶遮蔽圖層 */
+    /* 句子黑色遮蔽膠帶 */
     .chunk-text.masked {
       background-color: #000000 !important;
       color: #000000 !important;
@@ -193,7 +196,6 @@
       letter-spacing: 0.5px;
     }
 
-    /* 序號/定位Icon固定寬度 (以99.為基準) */
     .chunk-num {
       display: inline-block;
       width: 32px;
@@ -231,7 +233,6 @@
       white-space: nowrap;
     }
 
-    /* 2x2 卡片排版 */
     .stepper-cards-row {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -391,6 +392,21 @@
       border: 1.5px solid var(--border);
     }
 
+    .progress-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: #dbeafe;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.25s ease;
+    }
+
     .modal-close-btn {
       width: 40px;
       height: 40px;
@@ -489,21 +505,21 @@
 
     <!-- 視圖 B：【播放介面】 -->
     <section id="viewPlayer" class="card" style="display:none;">
-      <!-- 課文列：選定後遮蔽標題 + ↩️返回重選按鈕 + ➕加入按鈕 + 📋管理按鈕 -->
+      <!-- 課文列：已選定時改為純「空白」+ ↩️返回重選按鈕 -->
       <div id="catalogBar" class="lesson-select-bar">
         <div id="lessonPickerBox" style="flex:1; display:none;">
           <select id="lessonDropdown" onchange="onSelectLessonFromDropdown(this.value)"></select>
         </div>
         <div id="lessonChosenBox" style="flex:1; display:flex; align-items:center; gap:8px;">
           <button class="icon-btn" onclick="showLessonDropdownPicker()" title="重新揀選課文">↩️</button>
-          <div id="maskedLessonHeader" class="masked-lesson-box"></div>
+          <div id="blankLessonHeader" class="blank-lesson-box"></div>
         </div>
 
         <button class="icon-btn" onclick="switchView('ADD')" title="加入新課文">➕</button>
         <button class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
       </div>
 
-      <!-- 狀態列：狀態提示 + (移到最右側的)語音模型標籤 + 眼睛Icon (已解鎖時才顯示) -->
+      <!-- 狀態列：狀態提示 + 最右側語音標籤 + 眼睛Icon (已解鎖時才顯示) -->
       <div class="player-status-row">
         <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
         
@@ -515,7 +531,7 @@
         </div>
       </div>
 
-      <!-- 播放控制鍵：開始讀默 + 暫停 + 重播此句 + ⏮ 重頭開始 -->
+      <!-- 播放控制鍵 -->
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
         <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 開始讀默</button>
         <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
@@ -545,9 +561,10 @@
         <button class="btn btn-outline" style="padding:10px 14px; white-space:nowrap;" onclick="saveLessonTitle()">儲存標題</button>
       </div>
 
-      <label>語言模型下載狀態:</label>
+      <label>語言模型下載狀態 (支援多個點擊自動排隊):</label>
       <div id="voiceManageListContainer" style="margin-bottom:16px;"></div>
 
+      <!-- 自動排隊佇列進度顯示 -->
       <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
         <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
         <div class="progress-bar-bg" style="margin:0 0 4px 0;">
@@ -640,7 +657,7 @@
   <script>
     /**
      * ========================================================================
-     * 全域狀態
+     * 全域狀態與佇列
      * ========================================================================
      */
     const UNLOCK_STORAGE_KEY = 'dict_device_unlock_token';
@@ -667,7 +684,11 @@
     let audioBlobUrls = {};
 
     let isTextMasked = true; // 預設強制遮蔽文字
-    let selectedActiveIdx = -1; // 當前 Active 的卡片 (-1 代表未選取任何卡片)
+    let selectedActiveIdx = -1;
+
+    // 語音下載佇列（Queue）
+    let voiceDownloadQueue = [];
+    let isProcessingVoiceQueue = false;
 
     let dictation = {
       isRunning: false,
@@ -694,11 +715,6 @@
       } catch (e) {}
     }
 
-    /**
-     * ========================================================================
-     * 檔名規格同步函數 (與 Google Drive 100% 一致)
-     * ========================================================================
-     */
     function sanitizeFileName(str) {
       return String(str || '').replace(/[^a-zA-Z0-9\u4e00-\u9fa5_\-]/g, "_").substring(0, 45);
     }
@@ -746,13 +762,20 @@
       modelSel.innerHTML = APP_CONFIG.GEMINI_MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
     }
 
+    // 安全封裝 callGAS (防護非 JSON 報錯)
     async function callGAS(action, payloadObj = {}) {
       const res = await fetch(APP_CONFIG.GAS_WEB_APP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action, ...payloadObj })
       });
-      const json = await res.json();
+      const rawText = await res.text();
+      let json;
+      try {
+        json = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`伺服器連線回應異常 (${rawText.substring(0, 50)}...)`);
+      }
       if (!json.success) throw new Error(json.error || "系統連線異常");
       return json.data;
     }
@@ -915,14 +938,15 @@
     function showLessonChosenView() {
       document.getElementById('lessonPickerBox').style.display = 'none';
       document.getElementById('lessonChosenBox').style.display = 'flex';
-      renderMaskedLessonHeader();
+      renderBlankLessonHeader();
     }
 
-    function renderMaskedLessonHeader() {
-      const headerBox = document.getElementById('maskedLessonHeader');
+    // 課文選定後改為純「空白」(無黑色遮蔽方塊)
+    function renderBlankLessonHeader() {
+      const headerBox = document.getElementById('blankLessonHeader');
       if (!currentLesson || !headerBox) return;
       if (isTextMasked) {
-        headerBox.innerHTML = `<span class="chunk-text masked">${maskEnglishChars(currentLesson.title)}</span>`;
+        headerBox.innerText = ''; // 改為完全空白
       } else {
         headerBox.innerText = currentLesson.title;
       }
@@ -971,7 +995,7 @@
         currentLesson = data.lesson;
         renderCatalogDropdown();
         switchView('PLAYER');
-        await selectLesson(currentLesson.folderName);
+        await selectLesson(currentLesson.folderName || sanitizeFileName(currentLesson.title));
 
         openLessonManageModal();
 
@@ -985,14 +1009,13 @@
 
     /**
      * ========================================================================
-     * 課文管理 Modal
+     * 課文管理 Modal 與 背景自動排隊佇列（Queue）
      * ========================================================================
      */
     function openLessonManageModal() {
       if (!currentLesson) return;
       document.getElementById('manageTitleInput').value = currentLesson.title;
       renderVoiceManageList();
-      document.getElementById('voiceDownloadProgressBox').style.display = 'none';
       openModal('manageLessonModal');
     }
 
@@ -1005,9 +1028,22 @@
         const info = voicesMap[v.id];
         const isDownloaded = Boolean(info && info.downloaded);
         const countText = isDownloaded ? `${total}/${total}` : `0/${total}`;
-        const statusText = isDownloaded ? `✅ 已下載 (${countText})` : `❌ 未下載 (${countText})`;
-        const btnText = isDownloaded ? '🔄 重新下載' : '📥 下載語音';
-        const btnClass = isDownloaded ? 'btn-outline' : 'btn-success';
+        
+        let statusText = isDownloaded ? `✅ 已下載 (${countText})` : `❌ 未下載 (${countText})`;
+        let btnText = isDownloaded ? '🔄 重新下載' : '📥 下載語音';
+        let btnClass = isDownloaded ? 'btn-outline' : 'btn-success';
+
+        // 佇列排隊狀態展示
+        if (voiceDownloadQueue.includes(v.id)) {
+          if (voiceDownloadQueue[0] === v.id) {
+            statusText = `⏳ 正在下載中 (${countText})`;
+            btnText = '下載中...';
+          } else {
+            statusText = `⏳ 佇列排隊中...`;
+            btnText = '排隊中...';
+          }
+          btnClass = 'btn-warning';
+        }
 
         return `
           <div class="voice-manage-item">
@@ -1015,7 +1051,9 @@
               <span class="voice-manage-name">${v.label}</span>
               <span class="voice-manage-status">${statusText}</span>
             </div>
-            <button class="btn ${btnClass}" style="padding:6px 12px; font-size:0.8rem;" onclick="downloadSpecificVoice('${v.id}')">
+            <button class="btn ${btnClass}" style="padding:6px 12px; font-size:0.8rem;" 
+                    onclick="enqueueVoiceDownload('${v.id}')"
+                    ${voiceDownloadQueue.includes(v.id) ? 'disabled' : ''}>
               ${btnText}
             </button>
           </div>
@@ -1034,13 +1072,14 @@
       progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在更新標題...`;
 
       try {
+        const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
         const data = await callGAS('updateLessonTitle', {
-          payload: { oldFolderName: currentLesson.folderName, newTitle: newTitle, ghConfig: APP_CONFIG.GITHUB }
+          payload: { oldFolderName: targetFolder, newTitle: newTitle, ghConfig: APP_CONFIG.GITHUB }
         });
         currentLesson = data.lesson;
         lessonsIndex = data.indexList;
         renderCatalogDropdown();
-        renderMaskedLessonHeader();
+        renderBlankLessonHeader();
         renderChunks();
         progBox.style.display = 'none';
         alert("✅ 標題已成功修改！");
@@ -1050,8 +1089,30 @@
       }
     }
 
-    async function downloadSpecificVoice(voiceId) {
-      if (!currentLesson) return;
+    // 加入下載排隊佇列
+    function enqueueVoiceDownload(voiceId) {
+      if (voiceDownloadQueue.includes(voiceId)) return;
+      voiceDownloadQueue.push(voiceId);
+      renderVoiceManageList();
+
+      if (!isProcessingVoiceQueue) {
+        processVoiceQueue();
+      }
+    }
+
+    // 背景逐一處理排隊佇列
+    async function processVoiceQueue() {
+      if (voiceDownloadQueue.length === 0) {
+        isProcessingVoiceQueue = false;
+        document.getElementById('voiceDownloadProgressBox').style.display = 'none';
+        renderVoiceManageList();
+        return;
+      }
+
+      isProcessingVoiceQueue = true;
+      const voiceId = voiceDownloadQueue[0];
+      renderVoiceManageList();
+
       const progBox = document.getElementById('voiceDownloadProgressBox');
       const progText = document.getElementById('voiceProgText');
       const progBar = document.getElementById('voiceProgBarFill');
@@ -1061,6 +1122,7 @@
       const total = chunks.length;
       const batchSize = APP_CONFIG.TTS_BATCH_SIZE || 5;
       const allVoiceBlobs = [];
+      const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
 
       try {
         for (let i = 0; i < total; i += batchSize) {
@@ -1069,12 +1131,12 @@
           const endNum = Math.min(total, i + batchSize);
           const pct = Math.round((i / total) * 100);
 
-          progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在下載語音 (${startNum} ~ ${endNum} / ${total})...`;
+          progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在下載 [${getShortVoiceName(voiceId)}] (${startNum} ~ ${endNum} / ${total})...`;
           progBar.style.width = pct + '%';
 
           const res = await callGAS('step2_downloadVoiceBatch', {
             payload: {
-              folderName: currentLesson.folderName,
+              folderName: targetFolder,
               voiceName: voiceId,
               batchChunks: batch,
               ghConfig: APP_CONFIG.GITHUB
@@ -1084,12 +1146,12 @@
           allVoiceBlobs.push(...res.blobResults);
         }
 
-        progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在同步至 GitHub...`;
+        progText.innerHTML = `<span class="loading-hourglass">⏳</span> 正在同步 [${getShortVoiceName(voiceId)}] 至 GitHub...`;
         progBar.style.width = '95%';
 
         const commitRes = await callGAS('step3_commitVoiceBlobs', {
           payload: {
-            folderName: currentLesson.folderName,
+            folderName: targetFolder,
             voiceName: voiceId,
             allVoiceBlobs: allVoiceBlobs,
             ghConfig: APP_CONFIG.GITHUB
@@ -1099,23 +1161,22 @@
         progBar.style.width = '100%';
         currentLesson = commitRes.lesson;
         lessonsIndex = commitRes.indexList;
-        renderVoiceManageList();
-        progBox.style.display = 'none';
 
         if (serverState.settings.ttsVoice === voiceId) {
-          await selectLesson(currentLesson.folderName);
+          await selectLesson(targetFolder);
         }
-        alert(`✅ 語音模型「${getShortVoiceName(voiceId)}」已成功下載！`);
 
       } catch (err) {
-        progBox.style.display = 'none';
-        alert("語音下載中斷: " + err.message);
+        alert(`語音 [${getShortVoiceName(voiceId)}] 下載中斷: ` + err.message);
+      } finally {
+        voiceDownloadQueue.shift(); // 移出已完成的任務
+        processVoiceQueue();        // 自動處理佇列中的下一個
       }
     }
 
     /**
      * ========================================================================
-     * 課文播放引擎 (路徑為 {課文Title}/{語音模型}/{000_text.mp3})
+     * 課文播放引擎
      * ========================================================================
      */
     function getRawUrl(path) {
@@ -1141,14 +1202,14 @@
       } else {
         renderCatalogDropdown();
         switchView('PLAYER');
-        await selectLesson(lessonsIndex[0].folderName);
+        await selectLesson(lessonsIndex[0].folderName || sanitizeFileName(lessonsIndex[0].title));
       }
     }
 
     function renderCatalogDropdown() {
       const sel = document.getElementById('lessonDropdown');
       sel.innerHTML = lessonsIndex.map(item => `
-        <option value="${item.folderName}" ${currentLesson && currentLesson.folderName === item.folderName ? 'selected' : ''}>
+        <option value="${item.folderName || sanitizeFileName(item.title)}" ${currentLesson && (currentLesson.folderName === item.folderName || currentLesson.title === item.title) ? 'selected' : ''}>
           ${escapeHtml(item.title)}
         </option>
       `).join('');
@@ -1171,6 +1232,7 @@
         const res = await fetch(getRawUrl(`${folderName}/lesson.json`));
         if (!res.ok) throw new Error("讀取失敗");
         currentLesson = await res.json();
+        currentLesson.folderName = folderName;
 
         renderCatalogDropdown();
         showLessonChosenView();
@@ -1183,11 +1245,10 @@
         let loaded = 0;
         const total = currentLesson.chunks.length;
 
-        // GitHub-assets 路徑: {課文Title}/{語音模型}/{000_text.mp3}
         await Promise.all(currentLesson.chunks.map(async (chunk) => {
           let blobUrl = null;
           const fileName = getDriveMp3Name(chunk.index, chunk.text);
-          const audioPath = `${currentLesson.folderName}/${voiceName}/${fileName}`;
+          const audioPath = `${folderName}/${voiceName}/${fileName}`;
 
           try {
             const r = await fetch(getCdnUrl(audioPath));
@@ -1200,7 +1261,7 @@
           if (!blobUrl) {
             const fb = await callGAS('fallbackGetAudio', {
               payload: {
-                folderName: currentLesson.folderName,
+                folderName: folderName,
                 voiceName: voiceName,
                 chunk: chunk
               }
@@ -1306,7 +1367,6 @@
       const total = currentLesson.chunks.length;
       const maxPasses = Number(serverState.settings.repeatCount || 2);
 
-      // 全部播完：回到 Title (第0句) 並停播
       if (idx >= total) {
         dictation.isRunning = false;
         dictation.isPaused = false;
@@ -1458,8 +1518,9 @@
       closeModal('manageLessonModal');
 
       try {
+        const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
         const res = await callGAS('deleteLesson', {
-          payload: { folderName: currentLesson.folderName, ghConfig: APP_CONFIG.GITHUB }
+          payload: { folderName: targetFolder, ghConfig: APP_CONFIG.GITHUB }
         });
         lessonsIndex = res.indexList;
         currentLesson = null;
@@ -1467,7 +1528,7 @@
           switchView('ADD');
         } else {
           renderCatalogDropdown();
-          await selectLesson(lessonsIndex[0].folderName);
+          await selectLesson(lessonsIndex[0].folderName || sanitizeFileName(lessonsIndex[0].title));
         }
       } catch (e) {
         alert("刪除失敗: " + e.message);
@@ -1525,12 +1586,12 @@
       const unlocked = isDeviceUnlocked();
       if (!unlocked) {
         eyeBtn.style.display = 'none';
-        isTextMasked = true;
+        isTextMasked = true; // 強制遮蔽
       } else {
         eyeBtn.style.display = 'inline-flex';
         eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
       }
-      renderMaskedLessonHeader();
+      renderBlankLessonHeader();
       renderChunks();
     }
 
@@ -1764,7 +1825,8 @@
         serverState = await callGAS('saveSettings', { settings: draftSettings });
         closeSettingsModal();
         if (oldVoice !== serverState.settings.ttsVoice && currentLesson) {
-          await selectLesson(currentLesson.folderName);
+          const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
+          await selectLesson(targetFolder);
         }
       } catch (e) {
         alert("儲存設定失敗: " + e.message);
