@@ -14,7 +14,7 @@ const APP_CONFIG = {
   },
 
   // 3. 批次處理設定 (每批同時生成幾句 TTS，建議 5 句以兼顧極速與細膩進度條)
-  TTS_BATCH_SIZE: 5,
+  TTS_BATCH_SIZE: 20,
 
   // 4. 可供選擇的 TTS 語音模型清單 (Azure en-HK + Google Chirp 3 HD en-US)
 TTS_VOICES: [
