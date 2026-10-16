@@ -23,7 +23,6 @@ body {
   color: var(--text-main);
 }
 
-/* 旋轉漏斗動畫 */
 @keyframes spinHourglass {
   0% { transform: rotate(0deg); }
   50% { transform: rotate(180deg); }
@@ -37,7 +36,6 @@ body {
   vertical-align: middle;
 }
 
-/* 頂部導覽列 */
 .top-nav {
   display: flex;
   justify-content: space-between;
@@ -69,11 +67,10 @@ body {
   background: #fff;
   font-size: 1.25rem;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
-.icon-btn:active {
-  background: #f1f5f9;
-}
+.icon-btn:active { background: #f1f5f9; }
 
 .dot-badge {
   position: absolute;
@@ -131,11 +128,8 @@ body {
   text-align: center;
 }
 
-.big-upload-btn:active {
-  background: #1d4ed8;
-}
+.big-upload-btn:active { background: #1d4ed8; }
 
-/* 課文下拉與管理按鈕列 */
 .lesson-select-bar {
   display: flex;
   align-items: center;
@@ -143,12 +137,27 @@ body {
   margin-bottom: 12px;
 }
 
-.lesson-select-bar select {
+/* 揀好課文後的遮蔽標題容器 */
+.masked-lesson-box {
   flex: 1;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  height: 44px;
+  padding: 0 10px;
+  background: #f8fafc;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 
-/* 播放狀態標籤與語音快速切換 Badge */
+.player-status-row {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+}
+
 .voice-switch-badge {
   display: inline-flex;
   align-items: center;
@@ -158,28 +167,64 @@ body {
   border: 1px solid #bfdbfe;
   font-size: 0.8rem;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: 8px;
   cursor: pointer;
 }
 
-.voice-switch-badge:active {
-  background: #dbeafe;
-}
+.voice-switch-badge:active { background: #dbeafe; }
 
-/* 黑色遮蔽圖層（徹底取代模糊，字元替換為 Xx + 黑色遮蔽條） */
+/* 黑色遮蔽膠帶圖層 (徹底取代模糊) */
 .chunk-text.masked {
-  background-color: #0f172a;
-  color: #0f172a;
-  border-radius: 4px;
-  padding: 1px 4px;
+  background-color: #000000 !important;
+  color: #000000 !important;
+  border-radius: 3px;
+  padding: 0 4px;
   user-select: none;
   display: inline-block;
-  line-height: 1.4;
+  line-height: 1.35;
   letter-spacing: 0.5px;
 }
 
-/* 2x2 步進器卡片排版 */
+/* 序號/定位Icon固定寬度 (以99.為基準) */
+.chunk-num {
+  display: inline-block;
+  width: 32px;
+  text-align: right;
+  margin-right: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: var(--text-main);
+}
+
+.chunk-card {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.chunk-card.active {
+  border-color: #1e3a8a !important;
+  border-width: 2px;
+  background: #eff6ff;
+}
+
+.chunk-badge {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* 2x2 卡片排版 */
 .stepper-cards-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -229,9 +274,7 @@ body {
   cursor: pointer;
 }
 
-.stepper-btn:active {
-  background: #eff6ff;
-}
+.stepper-btn:active { background: #eff6ff; }
 
 .stepper-display {
   width: 52px;
@@ -247,21 +290,9 @@ body {
   padding: 0;
 }
 
-/* 鎖定卡片樣式 */
-.stepper-mini-card.lock-card {
-  border-width: 2px;
-  transition: all 0.2s;
-}
-
-.stepper-mini-card.lock-card.is-locked {
-  background: #fef2f2;
-  border-color: #ef4444;
-}
-
-.stepper-mini-card.lock-card.is-unlocked {
-  background: #f0fdf4;
-  border-color: #22c55e;
-}
+.stepper-mini-card.lock-card { border-width: 2px; }
+.stepper-mini-card.lock-card.is-locked { background: #fef2f2; border-color: #ef4444; }
+.stepper-mini-card.lock-card.is-unlocked { background: #f0fdf4; border-color: #22c55e; }
 
 .lock-action-btn {
   width: 90%;
@@ -296,7 +327,6 @@ body {
   gap: 6px;
 }
 
-/* 課文管理專用樣式 */
 .voice-manage-item {
   display: flex;
   justify-content: space-between;
@@ -308,23 +338,10 @@ body {
   background: #fff;
 }
 
-.voice-manage-info {
-  display: flex;
-  flex-direction: column;
-}
+.voice-manage-info { display: flex; flex-direction: column; }
+.voice-manage-name { font-size: 0.9rem; font-weight: 600; }
+.voice-manage-status { font-size: 0.76rem; color: var(--text-sub); margin-top: 2px; }
 
-.voice-manage-name {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.voice-manage-status {
-  font-size: 0.76rem;
-  color: var(--text-sub);
-  margin-top: 2px;
-}
-
-/* 表單與通用按鈕 */
 label {
   display: block;
   font-size: 0.88rem;
@@ -365,40 +382,6 @@ input[type="text"], input[type="password"], textarea, select {
   background: #fff;
   color: var(--text-main);
   border: 1.5px solid var(--border);
-}
-
-.chunk-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.chunk-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  background: #fff;
-  cursor: pointer;
-}
-
-.chunk-card.active {
-  border-color: var(--primary);
-  background: #eff6ff;
-  font-weight: 600;
-}
-
-.chunk-badge {
-  font-size: 0.75rem;
-  color: var(--text-sub);
-  background: #f1f5f9;
-  padding: 3px 8px;
-  border-radius: 6px;
-  margin-left: 8px;
-  white-space: nowrap;
 }
 
 .modal-close-btn {
