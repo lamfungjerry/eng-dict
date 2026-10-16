@@ -17,17 +17,17 @@ const APP_CONFIG = {
   TTS_BATCH_SIZE: 5,
 
   // 4. 可供選擇的 TTS 語音模型清單 (Azure en-HK + Google Chirp 3 HD en-US)
-  TTS_VOICES: [
-    { id: "en-HK-YanNeural", label: "🇭🇰 港澳英文女老師 - Yan (Azure Neural)", provider: "Azure" },
-    { id: "en-HK-SamNeural", label: "🇭🇰 港澳英文男老師 - Sam (Azure Neural)", provider: "Azure" },
-    { id: "en-US-Chirp3-HD-Aoede", label: "🇺🇸 美式自然女聲 - Aoede (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Kore", label: "🇺🇸 美式清晰女聲 - Kore (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Leda", label: "🇺🇸 美式溫柔女聲 - Leda (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Zephyr", label: "🇺🇸 美式輕快女聲 - Zephyr (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Puck", label: "🇺🇸 美式活力男聲 - Puck (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Charon", label: "🇺🇸 美式沉穩男聲 - Charon (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Fenrir", label: "🇺🇸 美式渾厚男聲 - Fenrir (Google Chirp 3 HD)", provider: "Google" },
-    { id: "en-US-Chirp3-HD-Orus", label: "🇺🇸 美式標準男聲 - Orus (Google Chirp 3 HD)", provider: "Google" }
+TTS_VOICES: [
+    { id: "en-HK-YanNeural", label: "港澳英文女老師 (Yan)", provider: "Microsoft Azure" },
+    { id: "en-HK-SamNeural", label: "港澳英文男老師 (Sam)", provider: "Microsoft Azure" },
+    { id: "en-US-Chirp3-HD-Aoede", label: "美式自然女聲 (Aoede)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Kore", label: "美式清晰女聲 (Kore)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Leda", label: "美式溫柔女聲 (Leda)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Zephyr", label: "美式輕快女聲 (Zephyr)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Puck", label: "美式活力男聲 (Puck)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Charon", label: "美式沉穩男聲 (Charon)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Fenrir", label: "美式渾厚男聲 (Fenrir)", provider: "Google Cloud" },
+    { id: "en-US-Chirp3-HD-Orus", label: "美式標準男聲 (Orus)", provider: "Google Cloud" }
   ],
 
   // 5. 可供選擇的課文分拆 / OCR 模型清單
