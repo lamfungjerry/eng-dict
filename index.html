@@ -146,7 +146,6 @@
       margin-bottom: 12px;
     }
 
-    /* 下拉選單平時清空文字（點擊時才顯示內容） */
     .lesson-select-blank {
       color: transparent !important;
     }
@@ -158,7 +157,7 @@
       background: #fff;
     }
 
-    /* 播放頁面控制器置頂吸頂容器 */
+    /* 播放頁面控制器吸頂置頂 */
     .sticky-player-controls {
       position: sticky;
       top: var(--nav-height);
@@ -222,7 +221,7 @@
       background: #fff;
       cursor: pointer;
       margin-bottom: 8px;
-      scroll-margin-top: 215px; /* 防遮擋：自動捲動時不會被置頂控制器蓋住 */
+      scroll-margin-top: 215px;
     }
 
     .chunk-card.active {
@@ -241,7 +240,6 @@
       white-space: nowrap;
     }
 
-    /* 控制按鈕：一行三格排版 */
     .controls-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -458,7 +456,7 @@
       transition: width 0.25s ease;
     }
 
-    /* 彈窗置頂標題列與捲動主體 */
+    /* 彈窗遮罩防穿透與鎖定滾動 */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -468,6 +466,7 @@
       align-items: center;
       z-index: 100;
       padding: 14px;
+      touch-action: none; /* 徹底杜絕觸控與滾動穿透 */
     }
 
     .modal {
@@ -480,6 +479,8 @@
       flex-direction: column;
       overflow: hidden;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      touch-action: pan-y;
+      overscroll-behavior: contain;
     }
 
     .modal-header {
@@ -578,7 +579,6 @@
 
     <!-- 視圖 B：播放介面 -->
     <section id="viewPlayer" class="card" style="display:none;">
-      <!-- 課文切換下拉列 (向上捲動時會自然滾走) -->
       <div id="catalogBar" class="lesson-select-bar">
         <select id="lessonDropdown" class="lesson-select-blank" 
                 onchange="onSelectLessonFromDropdown(this.value); this.blur();" 
@@ -589,7 +589,6 @@
         <button id="btnManageLesson" class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
       </div>
 
-      <!-- 控制面板置頂吸頂容器 (捲動時緊密吸附在頂部導覽列下方) -->
       <div class="sticky-player-controls">
         <div class="player-status-row">
           <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
@@ -602,9 +601,9 @@
           </div>
         </div>
 
-        <!-- 第一行控制鍵：播放/繼續 ｜ 暫停 ｜ 由頭播放 -->
+        <!-- 第一行控制鍵：自動播放 ｜ 暫停 ｜ 由頭播放 -->
         <div class="controls-grid">
-          <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 播放</button>
+          <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 自動播放</button>
           <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
           <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 由頭播放</button>
         </div>
@@ -655,7 +654,7 @@
           <button class="btn btn-outline" style="padding:10px 12px; font-size:0.85rem;" onclick="cancelTitleEdit()">取消</button>
         </div>
 
-        <!-- 下載進度條 (位於標題下方、未下載列表上方) -->
+        <!-- 下載進度條 -->
         <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
           <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
           <div class="progress-bar-bg" style="margin:0 0 4px 0;">
@@ -670,7 +669,7 @@
         </div>
         <div id="voicePendingListContainer" style="margin-bottom:14px;"></div>
 
-        <!-- 已下載語音列表 (排在進度條與未下載列表之後) -->
+        <!-- 已下載語音列表 -->
         <label>已下載語音:</label>
         <div id="voiceDownloadedListContainer" style="margin-bottom:16px;"></div>
 
@@ -829,6 +828,13 @@
      * ========================================================================
      */
     window.onload = async function() {
+      // 防止彈窗背景觸控穿透事件
+      document.querySelectorAll('.modal-backdrop').forEach(bd => {
+        bd.addEventListener('touchmove', (e) => {
+          if (e.target === bd) e.preventDefault();
+        }, { passive: false });
+      });
+
       populateConfigDropdowns();
       updateLockCardUI();
       updateEyeBtnUI();
@@ -1426,7 +1432,6 @@
         updateVoiceBadge();
         updateNavButtonsState();
 
-        // 載入到課文內容立即隱藏「連線中...」遮罩！
         document.getElementById('globalLoadingCard').style.display = 'none';
 
         await reloadAudioForCurrentLesson();
@@ -1511,7 +1516,7 @@
       }).join('');
     }
 
-    // 點擊卡片：直接播放此句、變 active，但不自動播放下一句！
+    // 點擊卡片：單句播放、設為 active，不自動跳下一句
     function onChunkCardClicked(idx) {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
@@ -1526,6 +1531,10 @@
       scrollChunkIntoView(idx);
       updateNavButtonsState();
 
+      playSingleChunkAudio(idx);
+    }
+
+    function playSingleChunkAudio(idx) {
       const chunk = currentLesson.chunks[idx];
       const label = chunk.isTitle ? "課題" : `第 ${chunk.index} 句`;
       document.getElementById('playerBanner').innerText = `🔊 朗讀：${label}`;
@@ -1535,23 +1544,47 @@
         player.src = audioBlobUrls[idx];
         player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
         player.onended = () => {
-          document.getElementById('playerBanner').innerText = `已選定：${label}`;
+          document.getElementById('playerBanner').innerText = `將播放${label}`;
         };
-        player.play().catch(() => {});
+        player.play().catch(() => {
+          document.getElementById('playerBanner').innerText = `將播放${label}`;
+        });
       }
     }
 
+    // 上一句：不中斷自動播放
     function handlePrevChunk() {
       if (!currentLesson || selectedActiveIdx <= 0) return;
-      onChunkCardClicked(selectedActiveIdx - 1);
+      navigateChunk(selectedActiveIdx - 1);
     }
 
+    // 下一句：不中斷自動播放
     function handleNextChunk() {
       if (!currentLesson) return;
       const total = currentLesson.chunks.length;
       if (selectedActiveIdx >= total - 1) return;
       const nextIdx = (selectedActiveIdx < 0) ? 0 : (selectedActiveIdx + 1);
-      onChunkCardClicked(nextIdx);
+      navigateChunk(nextIdx);
+    }
+
+    function navigateChunk(targetIdx) {
+      ensureIosAudioKeepAlive();
+      selectedActiveIdx = targetIdx;
+      dictation.chunkIdx = targetIdx;
+      dictation.pass = 1;
+      renderChunks();
+      scrollChunkIntoView(targetIdx);
+      updateNavButtonsState();
+
+      if (dictation.isRunning) {
+        clearInterval(dictation.timer);
+        dictation.isPaused = false;
+        document.getElementById('btnPlay').disabled = true;
+        document.getElementById('btnPause').disabled = false;
+        runDictationCycle();
+      } else {
+        playSingleChunkAudio(targetIdx);
+      }
     }
 
     function updateNavButtonsState() {
@@ -1616,7 +1649,7 @@
         scrollChunkIntoView(0);
         updateNavButtonsState();
 
-        document.getElementById('btnPlay').innerText = "▶ 播放";
+        document.getElementById('btnPlay').innerText = "▶ 自動播放";
         document.getElementById('btnPlay').disabled = false;
         document.getElementById('btnPause').disabled = true;
         document.getElementById('playerBanner').innerText = "🎉 讀默完成";
@@ -1696,7 +1729,7 @@
       player.onended = null;
 
       const btn = document.getElementById('btnPlay');
-      btn.innerText = "▶ 播放";
+      btn.innerText = "▶ 自動播放";
       btn.disabled = !currentLesson;
       document.getElementById('btnPause').disabled = true;
     }
@@ -1890,7 +1923,7 @@
 
     /**
      * ========================================================================
-     * Key Modal 控制
+     * Key Modal 控制 (已設定 badge 與 input box 互斥顯示)
      * ========================================================================
      */
     function openKeyModal() {
@@ -1910,12 +1943,12 @@
         if (isSet) {
           return `
             <div style="border-bottom:1px solid var(--border); padding:12px 0;">
-              <div style="font-size:0.92rem; font-weight:600;">${k.name}</div>
-              <div style="margin-top:6px;" onclick="toggleKeyInputBox('${k.id}')">
-                <span style="font-size:0.76rem; padding:4px 10px; border-radius:6px; font-weight:600; display:inline-block; background:#dcfce7; color:var(--success);">✅ 已設定</span>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.92rem; font-weight:600;">${k.name}</span>
+                <span id="key_badge_${k.id}" style="font-size:0.76rem; padding:4px 10px; border-radius:6px; font-weight:600; display:inline-block; background:#dcfce7; color:var(--success); cursor:pointer;" onclick="showKeyInput('${k.id}')">✅ 已設定</span>
               </div>
               <div id="key_wrap_${k.id}" style="display:none; margin-top:8px;">
-                <input type="password" id="key_input_${k.id}" placeholder="輸入新金鑰" oninput="markKeysDirty()">
+                <input type="password" id="key_input_${k.id}" placeholder="輸入新金鑰以覆蓋" oninput="markKeysDirty()">
               </div>
             </div>
           `;
@@ -1937,12 +1970,13 @@
       openModal('keyModal');
     }
 
-    function toggleKeyInputBox(keyId) {
+    // 點擊已設定標籤：標籤隱藏並替換為輸入框
+    function showKeyInput(keyId) {
+      const badge = document.getElementById(`key_badge_${keyId}`);
       const wrap = document.getElementById(`key_wrap_${keyId}`);
-      if (!wrap) return;
-      const isHidden = wrap.style.display === 'none';
-      wrap.style.display = isHidden ? 'block' : 'none';
-      if (isHidden) {
+      if (badge) badge.style.display = 'none';
+      if (wrap) {
+        wrap.style.display = 'block';
         const inp = document.getElementById(`key_input_${keyId}`);
         if (inp) inp.focus();
       }
@@ -2052,11 +2086,21 @@
 
     /**
      * ========================================================================
-     * 通用工具函數
+     * 通用工具函數 (鎖定滾動防穿透)
      * ========================================================================
      */
-    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function openModal(id) { 
+      document.getElementById(id).style.display = 'flex'; 
+      document.body.style.overflow = 'hidden'; // 鎖定底層滾動
+    }
+
+    function closeModal(id) { 
+      document.getElementById(id).style.display = 'none'; 
+      const anyOpen = Array.from(document.querySelectorAll('.modal-backdrop')).some(el => el.style.display === 'flex');
+      if (!anyOpen) {
+        document.body.style.overflow = ''; // 還原滾動
+      }
+    }
 
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
