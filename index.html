@@ -497,27 +497,33 @@
       await callGAS('discardPendingTask');
     }
 
+// 核心斷點續傳執行器：每次循環即時讀取最新狀態，精準同步進度條
     async function continuePipelineFromCheckpoint() {
       if (!activeTaskState) return;
       document.getElementById('btnResumeOnError').style.display = 'none';
 
       try {
-        const chunks = activeTaskState.chunks;
-        const total = chunks.length;
+        const total = activeTaskState.chunks.length;
         const batchSize = APP_CONFIG.TTS_BATCH_SIZE || 5;
 
         for (let i = 0; i < total; i += batchSize) {
-          const slice = chunks.slice(i, i + batchSize);
+          // 每次循環都動態讀取當前最新的 chunks 陣列，避免讀取舊變數
+          const currentChunks = activeTaskState.chunks;
+          const slice = currentChunks.slice(i, i + batchSize);
           const needsWork = slice.some(c => !c.driveFileId || !c.gitBlobSha);
 
           if (needsWork) {
-            const doneSoFar = chunks.filter(c => c.driveFileId && c.gitBlobSha).length;
+            // 計算當前真正已完成的句數
+            const doneSoFar = currentChunks.filter(c => c.driveFileId && c.gitBlobSha).length;
             const batchIndices = slice.map(c => c.index);
+            const startNum = batchIndices[0] + 1;
+            const endNum = batchIndices[batchIndices.length - 1] + 1;
 
+            // 即時同步顯示：正在處理哪幾句，以及目前已完成/尚餘的真實數字
             renderProgressUI(
               2, 3,
               activeTaskState.title,
-              `正在處理第 ${batchIndices[0] + 1} ~ ${batchIndices[batchIndices.length - 1] + 1} 句語音...`,
+              `正在處理第 ${startNum} ~ ${endNum} 句語音...`,
               doneSoFar,
               total
             );
@@ -530,6 +536,7 @@
               }
             });
 
+            // 立即將後端回傳的最新進度狀態覆蓋進 activeTaskState
             if (step2Res.updatedFullState) {
               activeTaskState = step2Res.updatedFullState;
             }
@@ -537,10 +544,21 @@
             if (!step2Res.batchSuccess) {
               throw new Error(step2Res.error || "處理中斷");
             }
+
+            // 本批次完成後，立刻推進進度條與百分比
+            const updatedDone = activeTaskState.chunks.filter(c => c.driveFileId && c.gitBlobSha).length;
+            renderProgressUI(
+              2, 3,
+              activeTaskState.title,
+              `第 ${startNum} ~ ${endNum} 句處理完成`,
+              updatedDone,
+              total
+            );
           }
         }
 
-        renderProgressUI(3, 3, activeTaskState.title, "正在同步課文清單...", total - 1, total);
+        // 所有批次完成，進入 Step 3 單次打包 Commit
+        renderProgressUI(3, 3, activeTaskState.title, "正在同步課文清單...", total, total);
 
         const step3Res = await callGAS('step3_commitToGitHub', {
           payload: {
