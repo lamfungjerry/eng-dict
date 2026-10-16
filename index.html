@@ -157,7 +157,7 @@
       background: #fff;
     }
 
-    /* 播放頁面控制器置頂吸頂 */
+    /* 播放頁面控制器吸頂置頂 */
     .sticky-player-controls {
       position: sticky;
       top: var(--nav-height);
@@ -221,7 +221,7 @@
       background: #fff;
       cursor: pointer;
       margin-bottom: 8px;
-      scroll-margin-top: 215px;
+      scroll-margin-top: 250px;
     }
 
     .chunk-card.active {
@@ -456,6 +456,7 @@
       transition: width 0.25s ease;
     }
 
+    /* 彈窗遮罩防穿透 */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -588,15 +589,13 @@
         <button id="btnManageLesson" class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
       </div>
 
+      <!-- 置頂吸頂控制容器 -->
       <div class="sticky-player-controls">
         <div class="player-status-row">
           <span id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</span>
           
           <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
             <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 載入中</span>
-            <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.1rem; display:none;" onclick="toggleMaskWithEye()">
-              👁️
-            </button>
           </div>
         </div>
 
@@ -613,15 +612,22 @@
           <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播</button>
           <button id="btnNext" class="btn btn-outline" onclick="handleNextChunk()" disabled>⏭ 下一句</button>
         </div>
+
+        <!-- 顯示/隱藏文字：放置於上一句/重播/下一句之後，課題第0句之前的右手邊 (僅已解鎖顯示) -->
+        <div id="eyeBarRow" style="display:none; justify-content:flex-end; align-items:center; margin-top:8px;">
+          <button type="button" id="btnEyeToggle" class="icon-btn" style="width:38px; height:38px; font-size:1.15rem;" onclick="toggleMaskWithEye()" title="顯示/隱藏文字">
+            👁️
+          </button>
+        </div>
       </div>
 
-      <audio id="mainAudio" playsinline controls style="width:100%; margin-bottom:8px;"></audio>
+      <audio id="mainAudio" playsinline style="display:none;"></audio>
       <div id="chunkListContainer" class="chunk-grid"></div>
     </section>
 
   </main>
 
-  <!-- 彈窗 1：選擇課文語音 (按 config.js 順序排，全下載完隱藏更多按鈕) -->
+  <!-- 彈窗 1：選擇課文語音 -->
   <div id="voicePickerModal" class="modal-backdrop">
     <div class="modal">
       <div class="modal-header">
@@ -928,7 +934,7 @@
 
     /**
      * ========================================================================
-     * 課文專屬語音選擇 Modal (按 config.js 順序排，全下載完成隱藏按鈕)
+     * 課文專屬語音選擇 Modal
      * ========================================================================
      */
     function openVoicePickerModal() {
@@ -936,7 +942,6 @@
       const container = document.getElementById('voicePickerList');
       const voicesMap = currentLesson.voices || {};
 
-      // 按 config.js 中的原始順序排列已下載的語音模型
       const downloadedVoices = APP_CONFIG.TTS_VOICES.filter(v => voicesMap[v.id] && voicesMap[v.id].downloaded);
 
       if (downloadedVoices.length === 0) {
@@ -967,7 +972,6 @@
         `;
       }).join('');
 
-      // 若未下載晒全部 config.js 中的模型，才顯示「下載更多」按鈕
       const hasMoreToDownload = APP_CONFIG.TTS_VOICES.some(v => !(voicesMap[v.id] && voicesMap[v.id].downloaded));
       if (hasMoreToDownload) {
         html += `
@@ -1556,13 +1560,11 @@
       }
     }
 
-    // 上一句：不中斷自動播放
     function handlePrevChunk() {
       if (!currentLesson || selectedActiveIdx <= 0) return;
       navigateChunk(selectedActiveIdx - 1);
     }
 
-    // 下一句：不中斷自動播放
     function handleNextChunk() {
       if (!currentLesson) return;
       const total = currentLesson.chunks.length;
@@ -1571,7 +1573,6 @@
       navigateChunk(nextIdx);
     }
 
-    // 上一句 / 下一句核心切換邏輯
     function navigateChunk(targetIdx) {
       ensureIosAudioKeepAlive();
 
@@ -1771,9 +1772,28 @@
       navigateChunk(target);
     }
 
+    // 精準捲動防遮擋：動態獲取吸頂面板高度，並確保目標句子 100% 完整呈現在畫面上
     function scrollChunkIntoView(idx) {
       const el = document.getElementById(`chunk_row_${idx}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (!el) return;
+
+      const topNav = document.querySelector('.top-nav');
+      const stickyControls = document.querySelector('.sticky-player-controls');
+      const navH = topNav ? topNav.offsetHeight : 64;
+      const controlsH = stickyControls ? stickyControls.offsetHeight : 160;
+      const stickyOffset = navH + controlsH + 10; // 吸頂區域總高度加上緩衝間距
+
+      const rect = el.getBoundingClientRect();
+      const windowH = window.innerHeight;
+
+      // 若卡片被置頂面板遮擋，或掉出視窗底緣，立即滑動到緊貼置頂面板下方的舒適位置
+      if (rect.top < stickyOffset || rect.bottom > windowH - 20) {
+        const targetScrollTop = window.pageYOffset + rect.top - stickyOffset;
+        window.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: 'smooth'
+        });
+      }
     }
 
     async function deleteCurrentLesson() {
@@ -1847,13 +1867,16 @@
 
     function updateEyeBtnUI() {
       const eyeBtn = document.getElementById('btnEyeToggle');
+      const eyeBar = document.getElementById('eyeBarRow');
       if (!eyeBtn) return;
 
       const unlocked = isDeviceUnlocked();
       if (!unlocked) {
+        if (eyeBar) eyeBar.style.display = 'none';
         eyeBtn.style.display = 'none';
         isTextMasked = true;
       } else {
+        if (eyeBar) eyeBar.style.display = 'flex';
         eyeBtn.style.display = 'inline-flex';
         eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
       }
@@ -1928,7 +1951,7 @@
 
     /**
      * ========================================================================
-     * Key Modal 控制 (已設定 badge 與 input box 互斥顯示)
+     * Key Modal 控制
      * ========================================================================
      */
     function openKeyModal() {
