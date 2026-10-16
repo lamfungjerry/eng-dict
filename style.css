@@ -24,12 +24,12 @@ body {
   color: var(--text-main);
 }
 
-/* 頂部導覽列 (左上 Key 設定，右上系統設定) */
+/* 頂部導覽列 (純 Icon) */
 .top-nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 10px 16px;
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -38,77 +38,63 @@ body {
 }
 
 .app-title {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
   margin: 0;
   color: var(--primary);
 }
 
-.nav-btn {
-  display: inline-flex;
+.icon-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: #fff;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1.25rem;
   cursor: pointer;
-  color: var(--text-main);
-  transition: all 0.15s;
 }
 
-.nav-btn:hover {
+.icon-btn:active {
   background: #f1f5f9;
 }
 
-.badge-warn {
-  background: var(--danger);
-  color: #fff;
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  border-radius: 99px;
+/* 提示紅點 */
+.dot-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  background-color: var(--danger);
+  border-radius: 50%;
+  border: 2px solid #fff;
 }
 
-.badge-ok {
-  background: var(--success);
-  color: #fff;
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  border-radius: 99px;
-}
-
-/* 主容器佈局 */
+/* 主容器 */
 .container {
-  max-width: 960px;
-  margin: 20px auto;
-  padding: 0 16px 40px;
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 20px;
-}
-
-@media (max-width: 768px) {
-  .container {
-    grid-template-columns: 1fr;
-  }
+  max-width: 600px;
+  margin: 12px auto;
+  padding: 0 14px 40px;
 }
 
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 18px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  margin-bottom: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  margin-bottom: 14px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .card-title {
@@ -117,71 +103,65 @@ body {
   margin: 0;
 }
 
-/* 課文清單 */
-.lesson-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 480px;
-  overflow-y: auto;
+/* 步進器 Stepper [-] [input] [+] */
+.stepper-group {
+  margin-bottom: 14px;
 }
 
-.lesson-item {
+.stepper-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 6px;
   display: flex;
   justify-content: space-between;
+}
+
+.stepper {
+  display: flex;
   align-items: center;
-  padding: 12px;
+  justify-content: center;
+  gap: 10px;
+}
+
+.stepper-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.lesson-item:hover, .lesson-item.active {
-  border-color: var(--primary);
-  background: #eff6ff;
-}
-
-.lesson-info {
-  flex: 1;
-  overflow: hidden;
-}
-
-.lesson-name {
+  background: #fff;
+  font-size: 1.4rem;
   font-weight: 600;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.lesson-meta {
-  font-size: 0.78rem;
-  color: var(--text-sub);
-  margin-top: 4px;
-}
-
-.del-btn {
-  background: transparent;
-  border: none;
-  color: var(--danger);
-  font-size: 1rem;
-  padding: 6px 8px;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  border-radius: 6px;
 }
 
-.del-btn:hover {
-  background: #fee2e2;
+.stepper-btn:active {
+  background: #eff6ff;
+  border-color: var(--primary);
 }
 
-/* 表單與按鈕 */
+.stepper-display {
+  width: 100px;
+  height: 44px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: var(--text-main);
+  outline: none;
+}
+
+/* 按鈕與表單 */
 label {
   display: block;
   font-size: 0.88rem;
   font-weight: 600;
-  margin: 12px 0 6px;
+  margin: 10px 0 6px;
 }
 
 input[type="text"], input[type="password"], textarea, select {
@@ -198,8 +178,8 @@ input[type="text"], input[type="password"], textarea, select {
   justify-content: center;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
   border: none;
   font-size: 0.95rem;
   font-weight: 600;
@@ -209,11 +189,8 @@ input[type="text"], input[type="password"], textarea, select {
   transition: opacity 0.15s;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
+.btn:active { opacity: 0.85; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-success { background: var(--success); }
 .btn-warning { background: var(--warning); }
 .btn-danger  { background: var(--danger); }
@@ -223,31 +200,69 @@ input[type="text"], input[type="password"], textarea, select {
   border: 1px solid var(--border);
 }
 
-/* 進度追蹤器 (Progress Box) */
-.progress-box {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 10px;
-  padding: 14px;
-  margin-top: 14px;
-  display: none;
+/* 課文目錄抽屜卡片 */
+.lesson-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.progress-step-badge {
-  display: inline-block;
-  background: var(--primary);
-  color: #fff;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  margin-bottom: 6px;
+.lesson-select-bar select {
+  flex: 1;
+  font-weight: 600;
+}
+
+/* 意群清單 */
+.chunk-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chunk-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.chunk-card.active {
+  border-color: var(--primary);
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+.chunk-text.masked {
+  filter: blur(6px);
+  user-select: none;
+}
+
+.chunk-badge {
+  font-size: 0.76rem;
+  color: var(--text-sub);
+  background: #f1f5f9;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+/* 進度條 */
+.progress-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 12px;
 }
 
 .progress-bar-bg {
   width: 100%;
   height: 12px;
-  background: #e0f2fe;
+  background: #dbeafe;
   border-radius: 99px;
   overflow: hidden;
   margin: 8px 0;
@@ -257,90 +272,65 @@ input[type="text"], input[type="password"], textarea, select {
   height: 100%;
   width: 0%;
   background: var(--primary);
-  transition: width 0.3s ease;
+  transition: width 0.25s ease;
 }
 
-.progress-detail {
-  font-size: 0.85rem;
-  color: var(--text-sub);
-  display: flex;
-  justify-content: space-between;
+/* Key Modal 特殊排版 */
+.key-block {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
 }
 
-/* 默書播放控制台 */
-.player-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 14px 0;
-  align-items: center;
+.key-block:last-child {
+  border-bottom: none;
 }
 
-.status-banner {
-  background: #f1f5f9;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  text-align: center;
-  margin-bottom: 14px;
-  color: var(--primary);
-}
-
-/* 意群 (Chunks) 卡片列表 */
-.chunk-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.chunk-card {
+.key-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s;
 }
 
-.chunk-card.active {
-  border-color: var(--primary);
-  background: #dbeafe;
+.key-title {
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
-.chunk-text.masked {
-  filter: blur(7px);
-  user-select: none;
+.key-sub-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
 }
 
-.chunk-badge {
-  font-size: 0.78rem;
-  color: var(--text-sub);
-  background: #f1f5f9;
+.badge-tag {
+  font-size: 0.75rem;
   padding: 3px 8px;
   border-radius: 6px;
+  font-weight: 600;
 }
 
-/* 彈出視窗 Modal */
+.badge-tag.ok { background: #dcfce7; color: var(--success); }
+.badge-tag.warn { background: #fee2e2; color: var(--danger); }
+
+/* Modal 基礎 */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.45);
   display: none;
   justify-content: center;
   align-items: center;
   z-index: 100;
-  padding: 16px;
+  padding: 14px;
 }
 
 .modal {
   background: #fff;
-  border-radius: 12px;
-  max-width: 480px;
+  border-radius: 14px;
+  max-width: 440px;
   width: 100%;
-  padding: 20px;
-  max-height: 90vh;
+  padding: 18px;
+  max-height: 88vh;
   overflow-y: auto;
 }
