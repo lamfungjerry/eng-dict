@@ -23,7 +23,7 @@ body {
   color: var(--text-main);
 }
 
-/* 旋轉漏斗動畫 (所有 Loading / 處理中畫面使用) */
+/* 旋轉漏斗動畫 */
 @keyframes spinHourglass {
   0% { transform: rotate(0deg); }
   50% { transform: rotate(180deg); }
@@ -37,7 +37,7 @@ body {
   vertical-align: middle;
 }
 
-/* 頂部導覽列 (純 Icon) */
+/* 頂部導覽列 */
 .top-nav {
   display: flex;
   justify-content: space-between;
@@ -67,7 +67,7 @@ body {
   border-radius: 12px;
   border: 1.5px solid var(--border);
   background: #fff;
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   cursor: pointer;
 }
 
@@ -114,7 +114,6 @@ body {
   margin: 0;
 }
 
-/* 加大圖片上傳按鈕 */
 .big-upload-btn {
   flex: 1;
   display: inline-flex;
@@ -136,7 +135,51 @@ body {
   background: #1d4ed8;
 }
 
-/* 步進器左右卡片式容器 */
+/* 課文下拉與管理按鈕列 */
+.lesson-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lesson-select-bar select {
+  flex: 1;
+  font-weight: 600;
+}
+
+/* 播放狀態標籤與語音快速切換 Badge */
+.voice-switch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.voice-switch-badge:active {
+  background: #dbeafe;
+}
+
+/* 黑色遮蔽圖層（徹底取代模糊，字元替換為 Xx + 黑色遮蔽條） */
+.chunk-text.masked {
+  background-color: #0f172a;
+  color: #0f172a;
+  border-radius: 4px;
+  padding: 1px 4px;
+  user-select: none;
+  display: inline-block;
+  line-height: 1.4;
+  letter-spacing: 0.5px;
+}
+
+/* 2x2 步進器卡片排版 */
 .stepper-cards-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -171,6 +214,40 @@ body {
   width: 100%;
 }
 
+.stepper-btn {
+  width: 34px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.stepper-btn:active {
+  background: #eff6ff;
+}
+
+.stepper-display {
+  width: 52px;
+  height: 36px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-main);
+  outline: none;
+  padding: 0;
+}
+
+/* 鎖定卡片樣式 */
 .stepper-mini-card.lock-card {
   border-width: 2px;
   transition: all 0.2s;
@@ -197,22 +274,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.15s;
 }
 
-.lock-action-btn.btn-to-unlock {
-  background: #ef4444;
-  color: #fff;
-}
-
-.lock-action-btn.btn-to-lock {
-  background: #16a34a;
-  color: #fff;
-}
-
-.lock-action-btn:active {
-  opacity: 0.8;
-}
+.lock-action-btn.btn-to-unlock { background: #ef4444; color: #fff; }
+.lock-action-btn.btn-to-lock   { background: #16a34a; color: #fff; }
 
 .btn-lock-all-devices {
   width: 100%;
@@ -231,41 +296,32 @@ body {
   gap: 6px;
 }
 
-.btn-lock-all-devices:active {
-  background: #ffe4e6;
-}
-
-.stepper-btn {
-  width: 32px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: #fff;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--primary);
+/* 課文管理專用樣式 */
+.voice-manage-item {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.stepper-btn:active {
-  background: #eff6ff;
-}
-
-.stepper-display {
-  width: 48px;
-  height: 36px;
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: 700;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
   background: #fff;
-  color: var(--text-main);
-  outline: none;
-  padding: 0;
+}
+
+.voice-manage-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.voice-manage-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.voice-manage-status {
+  font-size: 0.76rem;
+  color: var(--text-sub);
+  margin-top: 2px;
 }
 
 /* 表單與通用按鈕 */
@@ -311,42 +367,6 @@ input[type="text"], input[type="password"], textarea, select {
   border: 1.5px solid var(--border);
 }
 
-.lesson-select-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.lesson-select-bar select {
-  flex: 1;
-  font-weight: 600;
-}
-
-.progress-box {
-  background: #eff6ff;
-  border: 1.5px solid #bfdbfe;
-  border-radius: 14px;
-  padding: 16px;
-  margin-top: 10px;
-}
-
-.progress-bar-bg {
-  width: 100%;
-  height: 12px;
-  background: #dbeafe;
-  border-radius: 99px;
-  overflow: hidden;
-  margin: 10px 0;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--primary);
-  transition: width 0.25s ease;
-}
-
 .chunk-grid {
   display: flex;
   flex-direction: column;
@@ -371,11 +391,6 @@ input[type="text"], input[type="password"], textarea, select {
   font-weight: 600;
 }
 
-.chunk-text.masked {
-  filter: blur(6px);
-  user-select: none;
-}
-
 .chunk-badge {
   font-size: 0.75rem;
   color: var(--text-sub);
@@ -386,38 +401,6 @@ input[type="text"], input[type="password"], textarea, select {
   white-space: nowrap;
 }
 
-.key-item {
-  border-bottom: 1px solid var(--border);
-  padding: 12px 0;
-}
-
-.key-item:last-child {
-  border-bottom: none;
-}
-
-.key-row-inline {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.key-title {
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.badge-tag {
-  font-size: 0.76rem;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-weight: 600;
-  display: inline-block;
-}
-
-.badge-tag.ok { background: #dcfce7; color: var(--success); }
-.badge-tag.warn { background: #fee2e2; color: var(--danger); }
-
-/* 加大且有框的 Modal 右上關閉按鈕 */
 .modal-close-btn {
   width: 40px;
   height: 40px;
@@ -431,10 +414,6 @@ input[type="text"], input[type="password"], textarea, select {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-}
-
-.modal-close-btn:active {
-  background: #f1f5f9;
 }
 
 .modal-backdrop {
@@ -451,7 +430,7 @@ input[type="text"], input[type="password"], textarea, select {
 .modal {
   background: #fff;
   border-radius: 16px;
-  max-width: 440px;
+  max-width: 460px;
   width: 100%;
   padding: 18px;
   max-height: 88vh;
