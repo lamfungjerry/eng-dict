@@ -3,181 +3,186 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>港澳小學生英文智能讀默系統</title>
+  <title>英文讀默</title>
   <link rel="stylesheet" href="style.css">
   <script src="config.js"></script>
 </head>
 <body>
 
-  <!-- 頂部導覽列：左上 API Key 設定、右上 系統設定 -->
+  <!-- 頂部導覽列：純 Icon (帶紅點提示) -->
   <header class="top-nav">
-    <button class="nav-btn" onclick="openModal('keyModal')">
-      🔑 API 金鑰設定
-      <span id="keyAlertBadge" class="badge-warn" style="display:none;">有未設定</span>
-      <span id="keyOkBadge" class="badge-ok" style="display:none;">已就緒</span>
+    <button class="icon-btn" onclick="openKeyModal()" title="API 金鑰設定">
+      🔑
+      <span id="keyDot" class="dot-badge" style="display:none;"></span>
     </button>
 
-    <h1 class="app-title">📖 英文智能讀默</h1>
+    <h1 class="app-title">📖 英文讀默</h1>
 
-    <button class="nav-btn" onclick="openModal('settingsModal')">
-      ⚙️ 系統設定
+    <button class="icon-btn" onclick="openSettingsModal()" title="系統設定">
+      ⚙️
     </button>
   </header>
 
   <main class="container">
-    <!-- 左側欄：課文目錄與新增按鈕 -->
-    <section>
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">📚 課文目錄</h2>
-          <button class="btn" style="padding:6px 12px; font-size:0.85rem;" onclick="showAddPanel()">＋ 加入新課文</button>
-        </div>
-        <div id="lessonLoading" style="font-size:0.88rem; color:#64748b;">正在讀取課文清單...</div>
-        <ul id="lessonList" class="lesson-list"></ul>
+
+    <!-- 視圖 1：【加入課文面板】 (點擊加入或無課文時顯示，此時完全隱藏播放器) -->
+    <section id="viewAddLesson" class="card" style="display:none;">
+      <div class="card-header">
+        <h2 class="card-title">✨ 加入新課文</h2>
+        <button id="btnCancelAdd" class="btn btn-outline" style="padding:6px 10px; font-size:0.85rem;" onclick="showPlayerView()">返回播放</button>
       </div>
-    </section>
 
-    <!-- 右側欄：新增課文面板 / 讀默播放器面板 -->
-    <section>
-      <!-- 面板 A：加入新課文 -->
-      <div id="addLessonPanel" class="card" style="display:none;">
-        <div class="card-header">
-          <h2 class="card-title">✨ 加入並智能分拆課文</h2>
-          <button class="btn btn-outline" style="padding:4px 10px; font-size:0.82rem;" onclick="hideAddPanel()">返回播放</button>
-        </div>
-
-        <label>課文標題 (選填，留空由 Gemini 自動命名):</label>
-        <input type="text" id="newLessonTitle" placeholder="例如: Unit 2 - A Visit to Ocean Park">
+      <!-- 可編輯輸入區域：一旦開始分析上傳，自動整塊收合，避免誤觸彈出鍵盤 -->
+      <div id="addInputFields">
+        <label>課文標題 (選填，留空自動命名):</label>
+        <input type="text" id="newLessonTitle" placeholder="例如: Unit 1 - A Day at School">
 
         <label>拍攝課本相片 (OCR 辨識，選填):</label>
         <input type="file" id="ocrImageInput" accept="image/*" style="margin-bottom:8px;">
 
-        <label>或直接貼上英文課文內容:</label>
-        <textarea id="newLessonText" rows="5" placeholder="貼上英文段落，系統會自動按自然語意分拆成適合默書的短句..."></textarea>
+        <label>或直接貼上課文文字:</label>
+        <textarea id="newLessonText" rows="4" placeholder="貼上英文段落，系統將智能分拆意群..."></textarea>
 
-        <button id="startBuildBtn" class="btn" style="width:100%; margin-top:14px;" onclick="createAndCommitLesson()">
-          🚀 開始智能分析、生成 MP3 並上傳 GitHub
+        <button id="startBuildBtn" class="btn" style="width:100%; margin-top:14px;" onclick="startSchemeBBuild()">
+          🚀 開始智能分析並同步至雲端
         </button>
-
-        <!-- 4 階段真實進度條 -->
-        <div id="buildProgressBox" class="progress-box">
-          <span id="progStepBadge" class="progress-step-badge">Step 1 / 4</span>
-          <div id="progActionText" style="font-weight:600; font-size:0.95rem;">準備中...</div>
-          <div class="progress-bar-bg">
-            <div id="progBarFill" class="progress-bar-fill"></div>
-          </div>
-          <div class="progress-detail">
-            <span id="progCountText">已完成 0 / 0</span>
-            <span id="progRemainText">尚餘 0 未完成</span>
-          </div>
-        </div>
       </div>
 
-      <!-- 面板 B：讀默播放面板 -->
-      <div id="playerPanel" class="card">
-        <div class="card-header">
-          <div>
-            <h2 id="currentLessonTitle" class="card-title">請從左側選擇課文</h2>
-            <div id="currentLessonMeta" style="font-size:0.82rem; color:#64748b; margin-top:4px;"></div>
-          </div>
-          <label style="margin:0; display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="maskTextToggle" onchange="renderChunks()"> 🙈 隱藏文字 (默書模式)
-          </label>
+      <!-- 執行中動態展示區 (只顯示標題膠囊、進度條與續傳按鈕) -->
+      <div id="buildProgressBox" class="progress-box" style="display:none;">
+        <div id="activeLessonCapsule" style="font-weight:700; margin-bottom:6px; color:var(--primary);">處理中...</div>
+        <div id="progActionText" style="font-size:0.9rem; font-weight:600;">正在啟動...</div>
+        <div class="progress-bar-bg">
+          <div id="progBarFill" class="progress-bar-fill"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-sub);">
+          <span id="progCountText">第 0 / 0 句</span>
+          <span id="progStepBadge" style="font-weight:700;">Step 1/3</span>
         </div>
 
-        <div id="dictationStatusBanner" class="status-banner">尚未載入音檔</div>
-
-        <!-- 播放控制列 -->
-        <div class="player-controls">
-          <button id="btnPlayDictation" class="btn btn-success" onclick="startOrResumeDictation()" disabled>▶ 開始連續讀默</button>
-          <button id="btnPauseDictation" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
-          <button id="btnReplayChunk" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播此句</button>
-          <button id="btnStopDictation" class="btn btn-danger" onclick="stopDictation()" disabled>⏹ 停止</button>
-
-          <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
-            <span style="font-size:0.85rem; font-weight:600;">語速:</span>
-            <select id="liveSpeedSelect" style="width:auto; padding:6px 10px;" onchange="onChangeLiveSpeed()">
-              <option value="0.7">0.7x (極慢)</option>
-              <option value="0.85" selected>0.85x (適合默書)</option>
-              <option value="1.0">1.0x (正常)</option>
-              <option value="1.15">1.15x (稍快)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 原生單一 Audio 實例 (供 iOS 連續播放與單句預覽) -->
-        <audio id="mainAudioPlayer" playsinline controls style="width:100%; margin-bottom:14px;"></audio>
-
-        <!-- 分拆後的句子清單 -->
-        <div id="chunkListContainer" class="chunk-grid"></div>
+        <!-- 斷點續傳按鈕：僅在失敗時動態出現 -->
+        <button id="btnResumeTask" class="btn btn-warning" style="width:100%; margin-top:10px; display:none;" onclick="resumeSchemeBBuild()">
+          🔄 從斷點繼續處理 (免重新 Call API)
+        </button>
       </div>
     </section>
+
+    <!-- 視圖 2：【默書播放面板】 -->
+    <section id="viewPlayer" class="card" style="display:none;">
+      <!-- 目錄選擇列 (課文多於 0 篇時顯示) -->
+      <div id="catalogBar" class="lesson-select-bar">
+        <select id="lessonSelectDropdown" onchange="onSelectLessonDropdown(this.value)"></select>
+        <button class="btn" style="padding:10px 12px; font-size:0.85rem;" onclick="showAddView()">＋ 加入</button>
+        <button class="btn btn-outline" style="padding:10px 10px; color:var(--danger);" onclick="deleteCurrentLesson()" title="刪除此課文">🗑️</button>
+      </div>
+
+      <!-- 狀態提示與遮蔽切換 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0;">
+        <div id="statusBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">正在準備音檔...</div>
+        <label style="margin:0; font-size:0.85rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+          <input type="checkbox" id="maskToggle" onchange="renderChunks()"> 🙈 默書隱藏
+        </label>
+      </div>
+
+      <!-- 播放控制鍵 -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">
+        <button id="btnPlay" class="btn btn-success" onclick="startOrResumeDictation()" disabled>▶ 開始連續讀默</button>
+        <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:12px;">
+        <button id="btnReplay" class="btn btn-outline" onclick="replayCurrentChunk()" disabled>🔄 重播此句</button>
+        <button id="btnStop" class="btn btn-outline" onclick="stopDictation()" disabled>⏹ 停止</button>
+      </div>
+
+      <!-- 單一原生音訊實例 (iOS 背景保活通道) -->
+      <audio id="mainAudio" playsinline controls style="width:100%; margin-bottom:10px;"></audio>
+
+      <!-- 意群清單 -->
+      <div id="chunkContainer" class="chunk-grid"></div>
+    </section>
+
   </main>
 
-  <!-- 左上：API Key 設定 Modal (寫入 GAS 雲端，絕不回傳顯示明文) -->
+  <!-- 左上：API 金鑰設定 Modal -->
   <div id="keyModal" class="modal-backdrop">
     <div class="modal">
       <div class="card-header">
-        <h3 class="card-title">🔑 API 金鑰設定 (雲端安全儲存)</h3>
-        <button class="del-btn" onclick="closeModal('keyModal')">✕</button>
+        <h3 class="card-title">🔑 API 金鑰設定</h3>
+        <button class="icon-btn" style="width:32px; height:32px; border:none;" onclick="closeModal('keyModal')">✕</button>
       </div>
-      <p style="font-size:0.83rem; color:#64748b; margin-top:0;">
-        金鑰會直接加密存入 Google Apps Script 伺服器，跨裝置同步生效。已設定的金鑰無需重複輸入。
-      </p>
+      <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0;">設定加密存於雲端，跨裝置永久同步。</p>
 
-      <label>Gemini API Key: <span id="status_GEMINI_API_KEY"></span></label>
-      <input type="password" id="input_GEMINI_API_KEY" placeholder="如已設定可留空，輸入新值則覆蓋">
+      <div id="keyListContainer"></div>
 
-      <label>Google Cloud TTS API Key (Chirp 3 HD): <span id="status_GOOGLE_TTS_KEY"></span></label>
-      <input type="password" id="input_GOOGLE_TTS_KEY" placeholder="如已設定可留空，輸入新值則覆蓋">
-
-      <label>Microsoft Azure TTS Key (en-HK): <span id="status_AZURE_TTS_KEY"></span></label>
-      <input type="password" id="input_AZURE_TTS_KEY" placeholder="如已設定可留空，輸入新值則覆蓋">
-
-      <label>GitHub Personal Access Token (Assets Repo): <span id="status_GITHUB_TOKEN"></span></label>
-      <input type="password" id="input_GITHUB_TOKEN" placeholder="需具備 repo / Contents 讀寫權限">
-
-      <button id="saveKeyBtn" class="btn" style="width:100%; margin-top:16px;" onclick="submitKeys()">💾 儲存金鑰至雲端</button>
+      <button id="btnSaveKeys" class="btn" style="width:100%; margin-top:16px;" onclick="saveKeysToCloud()">
+        💾 儲存並關閉
+      </button>
     </div>
   </div>
 
-  <!-- 右上：系統設定 Modal (跨平台同步) -->
+  <!-- 右上：系統設定 Modal (含 3 大步進器，關閉時才同步雲端) -->
   <div id="settingsModal" class="modal-backdrop">
     <div class="modal">
       <div class="card-header">
-        <h3 class="card-title">⚙️ 系統預設設定 (跨平台同步)</h3>
-        <button class="del-btn" onclick="closeModal('settingsModal')">✕</button>
+        <h3 class="card-title">⚙️ 系統設定</h3>
+        <button class="icon-btn" style="width:32px; height:32px; border:none;" onclick="closeSettingsModalAndSync()">✕</button>
       </div>
 
-      <label>預設 TTS 語音模型:</label>
-      <select id="settingTtsVoice"></select>
+      <label>預設語音模型:</label>
+      <select id="modalVoiceSelect" style="margin-bottom:12px;"></select>
 
-      <label>課文分拆 / OCR 模型:</label>
-      <select id="settingGeminiModel"></select>
+      <label>分拆 / OCR 模型:</label>
+      <select id="modalModelSelect" style="margin-bottom:16px;"></select>
 
-      <label>每組詞句重複朗讀次數:</label>
-      <select id="settingRepeatCount">
-        <option value="1">讀 1 次</option>
-        <option value="2" selected>讀 2 次 (讀完停頓 -> 重複一次 -> 下一組)</option>
-        <option value="3">讀 3 次</option>
-      </select>
+      <!-- 步進器 1：播放速度 (0.50 ~ 1.50，幅度 0.05，預設 0.80) -->
+      <div class="stepper-group">
+        <div class="stepper-label">
+          <span>播放語速</span>
+          <span style="color:var(--text-sub);">0.50x ~ 1.50x</span>
+        </div>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="stepVal('playbackRate', -0.05, 0.50, 1.50, 2)">－</button>
+          <input type="text" id="step_playbackRate" class="stepper-display" readonly>
+          <button class="stepper-btn" onclick="stepVal('playbackRate', 0.05, 0.50, 1.50, 2)">＋</button>
+        </div>
+      </div>
 
-      <label>默書停頓時間倍率 (配合 AI 動態秒數):</label>
-      <select id="settingPauseMult">
-        <option value="0.8">0.8x (停頓較短)</option>
-        <option value="1.0" selected>1.0x (標準 AI 建議停頓)</option>
-        <option value="1.3">1.3x (停頓加長 30%)</option>
-        <option value="1.6">1.6x (停頓加長 60%)</option>
-      </select>
+      <!-- 步進器 2：讀幾次 (1 ~ 5 次，幅度 1，預設 2) -->
+      <div class="stepper-group">
+        <div class="stepper-label">
+          <span>每句朗讀次數</span>
+          <span style="color:var(--text-sub);">1 ~ 5 次</span>
+        </div>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="stepVal('repeatCount', -1, 1, 5, 0)">－</button>
+          <input type="text" id="step_repeatCount" class="stepper-display" readonly>
+          <button class="stepper-btn" onclick="stepVal('repeatCount', 1, 1, 5, 0)">＋</button>
+        </div>
+      </div>
 
-      <button id="saveSettingBtn" class="btn" style="width:100%; margin-top:16px;" onclick="submitSettings()">💾 儲存系統設定</button>
+      <!-- 步進器 3：停頓時間倍率 (0.5 ~ 2.0，幅度 0.1，預設 1.0) -->
+      <div class="stepper-group">
+        <div class="stepper-label">
+          <span>停頓時間倍率</span>
+          <span style="color:var(--text-sub);">0.5x ~ 2.0x</span>
+        </div>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="stepVal('pauseMultiplier', -0.1, 0.5, 2.0, 1)">－</button>
+          <input type="text" id="step_pauseMultiplier" class="stepper-display" readonly>
+          <button class="stepper-btn" onclick="stepVal('pauseMultiplier', 0.1, 0.5, 2.0, 1)">＋</button>
+        </div>
+      </div>
+
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="closeSettingsModalAndSync()">
+        💾 儲存設定並同步
+      </button>
     </div>
   </div>
 
   <script>
     /**
      * ========================================================================
-     * 全域狀態與 iOS 音訊保活引擎
+     * 全域狀態
      * ========================================================================
      */
     let serverState = {
@@ -185,67 +190,66 @@
       settings: {
         ttsVoice: 'en-HK-YanNeural',
         geminiModel: 'gemini-3.6-flash',
+        playbackRate: 0.80,
         repeatCount: 2,
-        pauseMultiplier: 1.0,
-        playbackRate: 0.85
+        pauseMultiplier: 1.0
       }
     };
 
+    let tempSettings = {}; // Modal 內微調用的暫存物件
     let lessonsIndex = [];
     let currentLesson = null;
-    let audioBlobUrls = {}; // { chunkIndex: blobUrl } 預載入記憶體確保 iOS 零延遲播放
+    let audioBlobUrls = {};
 
-    // 連續讀默狀態機
-    let dictationState = {
+    // 方案 B 斷點續傳任務狀態
+    let activeTask = null;
+
+    // 讀默播放狀態機
+    let dictation = {
       isRunning: false,
       isPaused: false,
-      currentChunkIdx: 0,
-      currentReadPass: 1, // 第幾次朗讀該組 (1 -> 停頓 -> 2 -> 停頓 -> 下一組)
-      pauseTimer: null
+      chunkIdx: 0,
+      pass: 1,
+      timer: null
     };
 
-    // Web Audio API 靜音保活（防止 iPad 等待學生寫字期間 Safari 休眠攔截下一句）
+    // iOS Web Audio 靜音保活引擎
     let keepAliveCtx = null;
-    function startIosAudioKeepAlive() {
+    function unlockIosAudioKeepAlive() {
       try {
         if (!keepAliveCtx) {
-          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          keepAliveCtx = new AudioContextClass();
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          keepAliveCtx = new AudioCtx();
           const osc = keepAliveCtx.createOscillator();
           const gain = keepAliveCtx.createGain();
-          gain.gain.value = 0.00001; // 極微弱無聲訊號維持 iOS 音訊通道開啟
+          gain.gain.value = 0.00001;
           osc.connect(gain);
           gain.connect(keepAliveCtx.destination);
           osc.start();
         }
-        if (keepAliveCtx.state === 'suspended') {
-          keepAliveCtx.resume();
-        }
-      } catch (e) {
-        console.warn("Web Audio KeepAlive warning:", e);
-      }
+        if (keepAliveCtx.state === 'suspended') keepAliveCtx.resume();
+      } catch (e) {}
     }
 
     /**
      * ========================================================================
-     * 初始化：載入下拉選單、向 GAS 同步設定、從 GitHub 載入課文目錄
+     * 初始化
      * ========================================================================
      */
     window.onload = async function() {
-      populateConfigDropdowns();
+      initDropdownOptions();
       await syncStateFromGAS();
-      await loadLessonsIndexFromGitHub();
+      await loadLessonsIndex();
     };
 
-    function populateConfigDropdowns() {
-      const voiceSel = document.getElementById('settingTtsVoice');
-      voiceSel.innerHTML = APP_CONFIG.TTS_VOICES.map(v => `<option value="${v.id}">${v.label}</option>`).join('');
+    function initDropdownOptions() {
+      const vSel = document.getElementById('modalVoiceSelect');
+      vSel.innerHTML = APP_CONFIG.TTS_VOICES.map(v => `<option value="${v.id}">${v.label}</option>`).join('');
 
-      const modelSel = document.getElementById('settingGeminiModel');
-      modelSel.innerHTML = APP_CONFIG.GEMINI_MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+      const mSel = document.getElementById('modalModelSelect');
+      mSel.innerHTML = APP_CONFIG.GEMINI_MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
     }
 
-    // 統一封裝呼叫 GAS (使用 text/plain 完美避開 CORS Preflight)
     async function callGAS(action, payloadObj = {}) {
       const res = await fetch(APP_CONFIG.GAS_WEB_APP_URL, {
         method: 'POST',
@@ -253,240 +257,164 @@
         body: JSON.stringify({ action, ...payloadObj })
       });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error || "GAS 執行失敗");
+      if (!json.success) throw new Error(json.error || "GAS 伺服器錯誤");
       return json.data;
     }
 
     async function syncStateFromGAS() {
       try {
-        const data = await callGAS('getInitState');
-        serverState = data;
-        updateKeyModalUI(data.keyStatus);
-        updateSettingsModalUI(data.settings);
-      } catch (err) {
-        console.error("無法連線至 GAS:", err);
-        document.getElementById('dictationStatusBanner').innerText = "⚠️ 無法連線至 GAS，請檢查 config.js 中的 GAS_WEB_APP_URL";
-      }
-    }
-
-    function updateKeyModalUI(keyStatus) {
-      const keys = ['GEMINI_API_KEY', 'GOOGLE_TTS_KEY', 'AZURE_TTS_KEY', 'GITHUB_TOKEN'];
-      let missingCount = 0;
-
-      keys.forEach(k => {
-        const el = document.getElementById('status_' + k);
-        const inputEl = document.getElementById('input_' + k);
-        inputEl.value = ''; // 絕不顯示明文 Key
-        if (keyStatus[k]) {
-          el.innerHTML = `<span class="badge-ok">✅ 已設定</span>`;
-        } else {
-          el.innerHTML = `<span class="badge-warn">⚠️ 未設定</span>`;
-          missingCount++;
-        }
-      });
-
-      // 只要必備的 Gemini + GitHub 以及至少一組 TTS 設定好，頂部顯示就緒，否則提示有未設定
-      const hasAnyTts = keyStatus['GOOGLE_TTS_KEY'] || keyStatus['AZURE_TTS_KEY'];
-      const allEssentialOk = keyStatus['GEMINI_API_KEY'] && keyStatus['GITHUB_TOKEN'] && hasAnyTts;
-
-      document.getElementById('keyAlertBadge').style.display = allEssentialOk ? 'none' : 'inline-block';
-      document.getElementById('keyOkBadge').style.display = allEssentialOk ? 'inline-block' : 'none';
-    }
-
-    function updateSettingsModalUI(s) {
-      document.getElementById('settingTtsVoice').value = s.ttsVoice;
-      document.getElementById('settingGeminiModel').value = s.geminiModel;
-      document.getElementById('settingRepeatCount').value = String(s.repeatCount);
-      document.getElementById('settingPauseMult').value = String(s.pauseMultiplier);
-      document.getElementById('liveSpeedSelect').value = String(s.playbackRate || 0.85);
-    }
-
-    async function submitKeys() {
-      const btn = document.getElementById('saveKeyBtn');
-      btn.disabled = true;
-      btn.innerText = "儲存中...";
-      try {
-        const keys = {
-          GEMINI_API_KEY: document.getElementById('input_GEMINI_API_KEY').value,
-          GOOGLE_TTS_KEY: document.getElementById('input_GOOGLE_TTS_KEY').value,
-          AZURE_TTS_KEY: document.getElementById('input_AZURE_TTS_KEY').value,
-          GITHUB_TOKEN: document.getElementById('input_GITHUB_TOKEN').value
-        };
-        const data = await callGAS('saveKeys', { keys });
-        serverState = data;
-        updateKeyModalUI(data.keyStatus);
-        closeModal('keyModal');
+        serverState = await callGAS('getInitState');
+        updateKeyDotAlert();
+        applyPlaybackRateToPlayer();
       } catch (e) {
-        alert("儲存失敗: " + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = "💾 儲存金鑰至雲端";
+        console.error("GAS 連線失敗:", e);
       }
     }
 
-    async function submitSettings() {
-      const btn = document.getElementById('saveSettingBtn');
-      btn.disabled = true;
-      btn.innerText = "同步至雲端中...";
-      try {
-        const settings = {
-          ttsVoice: document.getElementById('settingTtsVoice').value,
-          geminiModel: document.getElementById('settingGeminiModel').value,
-          repeatCount: Number(document.getElementById('settingRepeatCount').value),
-          pauseMultiplier: Number(document.getElementById('settingPauseMult').value),
-          playbackRate: Number(document.getElementById('liveSpeedSelect').value)
-        };
-        const data = await callGAS('saveSettings', { settings });
-        serverState = data;
-        updateSettingsModalUI(data.settings);
-        closeModal('settingsModal');
-      } catch (e) {
-        alert("儲存設定失敗: " + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = "💾 儲存系統設定";
-      }
+    function updateKeyDotAlert() {
+      const ks = serverState.keyStatus;
+      const hasTts = ks['GOOGLE_TTS_KEY'] || ks['AZURE_TTS_KEY'];
+      const ok = ks['GEMINI_API_KEY'] && ks['GITHUB_TOKEN'] && hasTts;
+      document.getElementById('keyDot').style.display = ok ? 'none' : 'block';
+    }
+
+    function applyPlaybackRateToPlayer() {
+      const p = document.getElementById('mainAudio');
+      if (p) p.playbackRate = serverState.settings.playbackRate;
     }
 
     /**
      * ========================================================================
-     * 讀取課文目錄與單課內容 (優先從 GitHub-assets 極速讀取)
+     * 視圖切換邏輯 (合理收合 / 互斥顯示)
      * ========================================================================
      */
-    function getGitHubRawUrl(path) {
+    function showAddView() {
+      document.getElementById('viewPlayer').style.display = 'none';
+      document.getElementById('viewAddLesson').style.display = 'block';
+      document.getElementById('addInputFields').style.display = 'block';
+      document.getElementById('buildProgressBox').style.display = 'none';
+      document.getElementById('btnCancelAdd').style.display = (lessonsIndex.length > 0) ? 'inline-block' : 'none';
+    }
+
+    function showPlayerView() {
+      if (lessonsIndex.length === 0) {
+        showAddView();
+        return;
+      }
+      document.getElementById('viewAddLesson').style.display = 'none';
+      document.getElementById('viewPlayer').style.display = 'block';
+    }
+
+    /**
+     * ========================================================================
+     * 課文目錄讀取與切換
+     * ========================================================================
+     */
+    function getRawUrl(path) {
       const { owner, assetsRepo, branch } = APP_CONFIG.GITHUB;
-      // 加上 timestamp 避免目錄更新後讀到舊快取
       return `https://raw.githubusercontent.com/${owner}/${assetsRepo}/${branch}/${path}?t=${Date.now()}`;
     }
 
-    function getJsDelivrUrl(path) {
+    function getCdnUrl(path) {
       const { owner, assetsRepo, branch } = APP_CONFIG.GITHUB;
       return `https://cdn.jsdelivr.net/gh/${owner}/${assetsRepo}@${branch}/${path}`;
     }
 
-    async function loadLessonsIndexFromGitHub() {
-      const loadingEl = document.getElementById('lessonLoading');
-      loadingEl.style.display = 'block';
+    async function loadLessonsIndex() {
       try {
-        const res = await fetch(getGitHubRawUrl('lessons/index.json'));
-        if (res.ok) {
-          lessonsIndex = await res.json();
-        } else {
-          lessonsIndex = [];
-        }
+        const res = await fetch(getRawUrl('lessons/index.json'));
+        lessonsIndex = res.ok ? await res.json() : [];
       } catch (e) {
         lessonsIndex = [];
-      } finally {
-        loadingEl.style.display = 'none';
-        renderLessonsList();
+      }
+
+      if (lessonsIndex.length === 0) {
+        showAddView();
+      } else {
+        renderLessonDropdown();
+        showPlayerView();
+        selectLesson(lessonsIndex[0].id);
       }
     }
 
-    function renderLessonsList() {
-      const ul = document.getElementById('lessonList');
-      if (lessonsIndex.length === 0) {
-        ul.innerHTML = `<li style="color:#64748b; font-size:0.88rem; padding:8px;">暫無課文，請點擊右上「＋ 加入新課文」</li>`;
-        return;
-      }
-
-      ul.innerHTML = lessonsIndex.map(item => `
-        <li class="lesson-item ${currentLesson && currentLesson.id === item.id ? 'active' : ''}" onclick="selectLesson('${item.id}')">
-          <div class="lesson-info">
-            <div class="lesson-name">${escapeHtml(item.title)}</div>
-            <div class="lesson-meta">${item.voiceName} · 共 ${item.chunkCount} 組</div>
-          </div>
-          <button class="del-btn" title="刪除此課文" onclick="event.stopPropagation(); confirmDeleteLesson('${item.id}', '${escapeHtml(item.title)}')">🗑️</button>
-        </li>
+    function renderLessonDropdown() {
+      const sel = document.getElementById('lessonSelectDropdown');
+      sel.innerHTML = lessonsIndex.map(item => `
+        <option value="${item.id}" ${currentLesson && currentLesson.id === item.id ? 'selected' : ''}>
+          ${escapeHtml(item.title)} (${item.chunkCount}組)
+        </option>
       `).join('');
     }
 
-    /**
-     * ========================================================================
-     * 讀取單一課文與三層音檔檢查 (1. GitHub CDN -> 2. Google Drive -> 3. 即時 TTS)
-     * ========================================================================
-     */
+    function onSelectLessonDropdown(id) {
+      selectLesson(id);
+    }
+
     async function selectLesson(lessonId) {
       stopDictation();
-      hideAddPanel();
-
-      const banner = document.getElementById('dictationStatusBanner');
-      banner.innerText = "⏳ 正在從 GitHub-assets 讀取課文資料與檢查音檔...";
-      document.getElementById('btnPlayDictation').disabled = true;
+      const banner = document.getElementById('statusBanner');
+      banner.innerText = "⏳ 正在預載音檔...";
+      document.getElementById('btnPlay').disabled = true;
 
       try {
-        const res = await fetch(getGitHubRawUrl(`lessons/lesson_${lessonId}.json`));
-        if (!res.ok) throw new Error("找不到該課文的 JSON 檔案");
+        const res = await fetch(getRawUrl(`lessons/lesson_${lessonId}.json`));
+        if (!res.ok) throw new Error("找不到課文 JSON");
         currentLesson = await res.json();
 
-        document.getElementById('currentLessonTitle').innerText = currentLesson.title;
-        document.getElementById('currentLessonMeta').innerText = `語音模型：${currentLesson.voiceName} ｜ 共 ${currentLesson.chunks.length} 組意群`;
-        renderLessonsList();
+        renderLessonDropdown();
         renderChunks();
 
-        // 釋放舊的記憶體音檔
-        Object.values(audioBlobUrls).forEach(url => URL.revokeObjectURL(url));
+        Object.values(audioBlobUrls).forEach(u => URL.revokeObjectURL(u));
         audioBlobUrls = {};
 
-        // 並行檢查與預載所有句子的 MP3 (先試 GitHub，無則自動觸發 GAS Drive/TTS Fallback)
-        let loadedCount = 0;
+        let loaded = 0;
         const total = currentLesson.chunks.length;
 
         await Promise.all(currentLesson.chunks.map(async (chunk) => {
-          const cdnUrl = getJsDelivrUrl(chunk.audioPath);
           let blobUrl = null;
-          let sourceTag = "GitHub";
-
           try {
-            const audioRes = await fetch(cdnUrl);
-            if (audioRes.ok) {
-              const blob = await audioRes.blob();
-              blobUrl = URL.createObjectURL(blob);
+            const r = await fetch(getCdnUrl(chunk.audioPath));
+            if (r.ok) {
+              const b = await r.blob();
+              blobUrl = URL.createObjectURL(b);
             }
           } catch (e) {}
 
-          // 若 GitHub-assets 無該 MP3，自動進入第 2 & 第 3 層容錯 (Google Drive 快速搜尋 -> 即時 TTS)
           if (!blobUrl) {
-            const fallbackData = await callGAS('fallbackGetAudio', {
-              payload: {
-                lessonTitle: currentLesson.title,
-                voiceName: currentLesson.voiceName,
-                chunk: chunk
-              }
+            const fb = await callGAS('fallbackGetAudio', {
+              payload: { lessonTitle: currentLesson.title, voiceName: currentLesson.voiceName, chunk: chunk }
             });
-            blobUrl = fallbackData.audioData;
-            sourceTag = fallbackData.source === 'live_tts' ? '即時 TTS 補齊' : 'Google Drive 備份';
+            blobUrl = fb.audioData;
           }
 
           audioBlobUrls[chunk.index] = blobUrl;
-          loadedCount++;
-          banner.innerText = `⚡ 正在預載音檔 (${loadedCount} / ${total}) [來源: ${sourceTag}]...`;
+          loaded++;
+          banner.innerText = `⚡ 預載中 (${loaded}/${total})...`;
         }));
 
-        banner.innerText = `✅ 全部 ${total} 組音檔已準備就緒！點擊「▶ 開始連續讀默」即可開始。`;
-        document.getElementById('btnPlayDictation').disabled = false;
-        document.getElementById('btnReplayChunk').disabled = false;
+        banner.innerText = `✅ 已就緒 (共 ${total} 組)`;
+        document.getElementById('btnPlay').disabled = false;
+        document.getElementById('btnReplay').disabled = false;
 
-      } catch (err) {
-        banner.innerText = "❌ 讀取課文失敗: " + err.message;
+      } catch (e) {
+        banner.innerText = "❌ 載入失敗: " + e.message;
       }
     }
 
     function renderChunks() {
-      const container = document.getElementById('chunkListContainer');
-      if (!currentLesson) {
-        container.innerHTML = '';
-        return;
-      }
-      const isMasked = document.getElementById('maskTextToggle').checked;
-      const mult = serverState.settings.pauseMultiplier || 1.0;
+      const cont = document.getElementById('chunkContainer');
+      if (!currentLesson) { cont.innerHTML = ''; return; }
 
-      container.innerHTML = currentLesson.chunks.map((c, idx) => {
-        const waitSec = Math.round(c.pauseSeconds * mult);
-        const isActive = dictationState.isRunning && dictationState.currentChunkIdx === idx;
+      const isMasked = document.getElementById('maskToggle').checked;
+      const mult = serverState.settings.pauseMultiplier;
+
+      cont.innerHTML = currentLesson.chunks.map((c, idx) => {
+        const waitSec = (c.pauseSeconds * mult).toFixed(1);
+        const isActive = dictation.isRunning && dictation.chunkIdx === idx;
         return `
-          <div id="chunk_card_${idx}" class="chunk-card ${isActive ? 'active' : ''}" onclick="playSingleChunkPreview(${idx})">
+          <div id="chunk_${idx}" class="chunk-card ${isActive ? 'active' : ''}" onclick="playPreview(${idx})">
             <span class="chunk-text ${isMasked ? 'masked' : ''}">${idx + 1}. ${escapeHtml(c.text)}</span>
-            <span class="chunk-badge">停頓 ${waitSec} 秒</span>
+            <span class="chunk-badge">${waitSec}s</span>
           </div>
         `;
       }).join('');
@@ -494,141 +422,132 @@
 
     /**
      * ========================================================================
-     * 新增課文 4 階段進度條調度器 (OCR/分拆 -> 批次並行 TTS & Drive -> Git Tree 單次 Commit)
+     * 方案 B 建置流水線 (含斷點續傳)
      * ========================================================================
      */
-    function updateBuildProgress(step, totalSteps, actionText, completed, total) {
-      const box = document.getElementById('buildProgressBox');
-      box.style.display = 'block';
-      document.getElementById('progStepBadge').innerText = `Step ${step} / ${totalSteps}`;
-      document.getElementById('progActionText').innerText = actionText;
-
-      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-      document.getElementById('progBarFill').style.width = `${pct}%`;
-      document.getElementById('progCountText').innerText = `已完成 ${completed} / ${total} (${pct}%)`;
-      document.getElementById('progRemainText').innerText = `尚餘 ${Math.max(0, total - completed)} 未完成`;
-    }
-
-    async function createAndCommitLesson() {
-      const titleInput = document.getElementById('newLessonTitle').value.trim();
+    async function startSchemeBBuild() {
+      const title = document.getElementById('newLessonTitle').value.trim();
       const rawText = document.getElementById('newLessonText').value.trim();
       const fileInput = document.getElementById('ocrImageInput');
-      const btn = document.getElementById('startBuildBtn');
 
       if (!rawText && (!fileInput.files || fileInput.files.length === 0)) {
-        alert("請貼上課文文字，或選擇一張課本相片進行 OCR！");
+        alert("請貼上課文文字或選取課本照片！");
         return;
       }
 
-      btn.disabled = true;
+      // 開始處理：隱藏所有輸入框防誤觸，展現進度區
+      document.getElementById('addInputFields').style.display = 'none';
+      document.getElementById('buildProgressBox').style.display = 'block';
+      document.getElementById('btnResumeTask').style.display = 'none';
+
       try {
-        // 處理相片 Base64 (如有)
-        let imageBase64 = null, imageMimeType = null;
+        let b64 = null, mime = null;
         if (fileInput.files && fileInput.files.length > 0) {
-          const file = fileInput.files[0];
-          imageMimeType = file.type;
-          imageBase64 = await fileToBase64(file);
+          const f = fileInput.files[0];
+          mime = f.type;
+          b64 = await fileToBase64(f);
         }
 
-        // --- STEP 1: Gemini OCR 與意群分拆 + 建立 Drive 資料夾 ---
-        updateBuildProgress(1, 4, "正在使用 Gemini 進行課文 OCR 及自然意群分拆...", 0, 1);
+        updateBuildUI(1, 3, "正在呼叫 Gemini 進行 OCR 與意群分拆...", 0, 1);
         const step1Data = await callGAS('step1_analyzeAndPrepare', {
           payload: {
-            title: titleInput,
+            title: title,
             rawText: rawText,
-            imageBase64: imageBase64,
-            imageMimeType: imageMimeType,
+            imageBase64: b64,
+            imageMimeType: mime,
             geminiModel: serverState.settings.geminiModel,
             voiceName: serverState.settings.ttsVoice
           }
         });
 
-        const totalChunks = step1Data.chunks.length;
-        updateBuildProgress(1, 4, `分拆完成！共拆分為 ${totalChunks} 組短句。`, 1, 1);
+        activeTask = {
+          fullTaskState: step1Data,
+          batchSize: APP_CONFIG.TTS_BATCH_SIZE || 5,
+          currentBatchStart: 0
+        };
 
-        // --- STEP 2: 分批並行生成 TTS、存入 Google Drive 並上傳 GitHub Blobs ---
-        const batchSize = APP_CONFIG.TTS_BATCH_SIZE || 5;
-        const completedChunks = [];
-
-        for (let i = 0; i < totalChunks; i += batchSize) {
-          const batch = step1Data.chunks.slice(i, i + batchSize);
-          updateBuildProgress(
-            2, 4,
-            `正在生成語音 (${step1Data.voiceName}) 並備份至 Google Drive...`,
-            completedChunks.length,
-            totalChunks
-          );
-
-          const step2Data = await callGAS('step2_processBatchTTS', {
-            payload: {
-              chunks: batch,
-              voiceName: step1Data.voiceName,
-              driveFolderId: step1Data.driveFolderId,
-              ghConfig: APP_CONFIG.GITHUB
-            }
-          });
-
-          completedChunks.push(...step2Data.processedChunks);
-          updateBuildProgress(
-            2, 4,
-            `語音生成中 (${completedChunks.length} / ${totalChunks} 句完成)...`,
-            completedChunks.length,
-            totalChunks
-          );
-        }
-
-        // --- STEP 3: 一次過將所有 MP3 與 lesson_{id}.json Commit 至 GitHub-assets ---
-        updateBuildProgress(3, 4, "正在將全部 MP3 與課文結構一次過 Commit 至 GitHub-assets...", 0, 1);
-        const step3Data = await callGAS('step3_commitToGitHub', {
-          payload: {
-            lesson: {
-              id: step1Data.lessonId,
-              title: step1Data.title,
-              voiceName: step1Data.voiceName,
-              chunks: completedChunks
-            },
-            ghConfig: APP_CONFIG.GITHUB
-          }
-        });
-        updateBuildProgress(3, 4, "GitHub-assets 單次打包 Commit 完成！", 1, 1);
-
-        // --- STEP 4: 更新介面並載入新課文 ---
-        updateBuildProgress(4, 4, "全部完成！正在載入新課文...", totalChunks, totalChunks);
-        lessonsIndex = step3Data.indexList;
-        renderLessonsList();
-
-        // 清空輸入框並自動跳轉播放新課文
-        document.getElementById('newLessonTitle').value = '';
-        document.getElementById('newLessonText').value = '';
-        document.getElementById('ocrImageInput').value = '';
-        await selectLesson(step1Data.lessonId);
+        document.getElementById('activeLessonCapsule').innerText = `課文: ${step1Data.title}`;
+        await executeBatchPipeline();
 
       } catch (err) {
-        alert("處理過程中發生錯誤: " + err.message);
-      } finally {
-        btn.disabled = false;
+        showPipelineError(err.message);
       }
     }
 
-    async function confirmDeleteLesson(lessonId, title) {
-      if (!confirm(`確定要從 GitHub 刪除課文「${title}」及其 MP3 嗎？\n(Google Drive 內的 MP3 備份會為你保留)`)) return;
+    async function executeBatchPipeline() {
+      const { fullTaskState, batchSize } = activeTask;
+      const total = fullTaskState.chunks.length;
 
-      const banner = document.getElementById('dictationStatusBanner');
-      banner.innerText = `🗑️ 正在從 GitHub-assets 刪除課文「${title}」...`;
+      for (let i = activeTask.currentBatchStart; i < total; i += batchSize) {
+        activeTask.currentBatchStart = i;
+        const batch = fullTaskState.chunks.slice(i, i + batchSize);
 
+        updateBuildUI(2, 3, `TTS 生成中並同步上傳 GitHub (${i}/${total})...`, i, total);
+
+        const res = await callGAS('step2_schemeB_batchTTSAndBlobs', {
+          payload: {
+            batchChunks: batch,
+            voiceName: fullTaskState.voiceName,
+            driveFolderId: fullTaskState.driveFolderId,
+            ghConfig: APP_CONFIG.GITHUB,
+            fullTaskState: fullTaskState
+          }
+        });
+
+        activeTask.fullTaskState = res.updatedFullState;
+      }
+
+      updateBuildUI(3, 3, "進行 GitHub 單次 Commit 與建立結構檔...", total, total);
+      const step3Res = await callGAS('step3_commitToGitHub', {
+        payload: { fullTaskState: activeTask.fullTaskState, ghConfig: APP_CONFIG.GITHUB }
+      });
+
+      lessonsIndex = step3Res.indexList;
+      activeTask = null;
+
+      // 完成：切換至播放模式
+      document.getElementById('newLessonTitle').value = '';
+      document.getElementById('newLessonText').value = '';
+      document.getElementById('ocrImageInput').value = '';
+      showPlayerView();
+      await selectLesson(step3Res.lesson.id);
+    }
+
+    function resumeSchemeBBuild() {
+      if (!activeTask) return;
+      document.getElementById('btnResumeTask').style.display = 'none';
+      executeBatchPipeline().catch(err => showPipelineError(err.message));
+    }
+
+    function showPipelineError(msg) {
+      document.getElementById('progActionText').innerText = "❌ 處理暫停: " + msg;
+      document.getElementById('btnResumeTask').style.display = 'block';
+    }
+
+    function updateBuildUI(step, totalSteps, action, done, total) {
+      document.getElementById('progStepBadge').innerText = `Step ${step}/${totalSteps}`;
+      document.getElementById('progActionText').innerText = action;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('progBarFill').style.width = pct + '%';
+      document.getElementById('progCountText').innerText = `已完成 ${done} / ${total} 句`;
+    }
+
+    async function deleteCurrentLesson() {
+      if (!currentLesson) return;
+      if (!confirm(`確定要刪除課文「${currentLesson.title}」嗎？\n(Drive 內的 MP3 將會保留)`)) return;
+
+      document.getElementById('statusBanner').innerText = "🗑️ 刪除中...";
       try {
         const res = await callGAS('deleteLesson', {
-          payload: { lessonId, ghConfig: APP_CONFIG.GITHUB }
+          payload: { lessonId: currentLesson.id, ghConfig: APP_CONFIG.GITHUB }
         });
         lessonsIndex = res.indexList;
-        if (currentLesson && currentLesson.id === lessonId) {
-          stopDictation();
-          currentLesson = null;
-          document.getElementById('currentLessonTitle').innerText = "請從左側選擇課文";
-          document.getElementById('chunkListContainer').innerHTML = '';
+        currentLesson = null;
+        if (lessonsIndex.length === 0) {
+          showAddView();
+        } else {
+          selectLesson(lessonsIndex[0].id);
         }
-        renderLessonsList();
-        banner.innerText = `✅ 已成功刪除課文「${title}」！`;
       } catch (e) {
         alert("刪除失敗: " + e.message);
       }
@@ -636,165 +555,154 @@
 
     /**
      * ========================================================================
-     * iOS 連續讀默播放引擎 (讀第1次 -> 停頓 -> 重複讀第2次 -> 停頓 -> 下一組)
+     * iOS 讀默連續播放引擎
      * ========================================================================
      */
-    function onChangeLiveSpeed() {
-      const player = document.getElementById('mainAudioPlayer');
-      const rate = parseFloat(document.getElementById('liveSpeedSelect').value);
-      player.playbackRate = rate;
-      serverState.settings.playbackRate = rate;
-    }
-
-    function playSingleChunkPreview(idx) {
+    function playPreview(idx) {
       if (!currentLesson || !audioBlobUrls[idx]) return;
       stopDictation();
-      startIosAudioKeepAlive();
+      unlockIosAudioKeepAlive();
 
-      dictationState.currentChunkIdx = idx;
-      highlightActiveChunk(idx);
+      dictation.chunkIdx = idx;
+      highlightChunk(idx);
 
-      const player = document.getElementById('mainAudioPlayer');
-      player.src = audioBlobUrls[idx];
-      player.playbackRate = parseFloat(document.getElementById('liveSpeedSelect').value);
-      player.onended = null;
-      player.play();
-      document.getElementById('dictationStatusBanner').innerText = `🔊 單句預覽：第 ${idx + 1} 組`;
+      const p = document.getElementById('mainAudio');
+      p.src = audioBlobUrls[idx];
+      p.playbackRate = serverState.settings.playbackRate;
+      p.onended = null;
+      p.play();
+      document.getElementById('statusBanner').innerText = `🔊 單句預覽: 第 ${idx + 1} 組`;
     }
 
     function startOrResumeDictation() {
       if (!currentLesson) return;
-      startIosAudioKeepAlive();
+      unlockIosAudioKeepAlive();
 
-      if (dictationState.isRunning && dictationState.isPaused) {
-        dictationState.isPaused = false;
-        document.getElementById('btnPlayDictation').disabled = true;
-        document.getElementById('btnPauseDictation').disabled = false;
-        runDictationStep();
+      if (dictation.isRunning && dictation.isPaused) {
+        dictation.isPaused = false;
+        document.getElementById('btnPlay').disabled = true;
+        document.getElementById('btnPause').disabled = false;
+        runStep();
         return;
       }
 
-      dictationState.isRunning = true;
-      dictationState.isPaused = false;
-      dictationState.currentChunkIdx = 0;
-      dictationState.currentReadPass = 1;
+      dictation.isRunning = true;
+      dictation.isPaused = false;
+      dictation.chunkIdx = 0;
+      dictation.pass = 1;
 
-      document.getElementById('btnPlayDictation').disabled = true;
-      document.getElementById('btnPauseDictation').disabled = false;
-      document.getElementById('btnStopDictation').disabled = false;
+      document.getElementById('btnPlay').disabled = true;
+      document.getElementById('btnPause').disabled = false;
+      document.getElementById('btnStop').disabled = false;
 
-      runDictationStep();
+      runStep();
     }
 
-    function runDictationStep() {
-      if (!dictationState.isRunning || dictationState.isPaused || !currentLesson) return;
+    function runStep() {
+      if (!dictation.isRunning || dictation.isPaused || !currentLesson) return;
 
-      const idx = dictationState.currentChunkIdx;
+      const idx = dictation.chunkIdx;
       const total = currentLesson.chunks.length;
-      const totalPasses = serverState.settings.repeatCount || 2;
+      const totalPass = serverState.settings.repeatCount;
 
       if (idx >= total) {
         stopDictation();
-        document.getElementById('dictationStatusBanner').innerText = "🎉 恭喜！全篇課文讀默已完成！";
+        document.getElementById('statusBanner').innerText = "🎉 課文讀默已完成！";
         return;
       }
 
       const chunk = currentLesson.chunks[idx];
-      highlightActiveChunk(idx);
+      highlightChunk(idx);
 
-      const banner = document.getElementById('dictationStatusBanner');
-      banner.innerText = `🔊 正在朗讀：第 ${idx + 1} / ${total} 組 (第 ${dictationState.currentReadPass} / ${totalPasses} 次)`;
+      const banner = document.getElementById('statusBanner');
+      banner.innerText = `🔊 朗讀中 (${idx + 1}/${total}) [第 ${dictation.pass}/${totalPass} 次]`;
 
-      const player = document.getElementById('mainAudioPlayer');
+      const player = document.getElementById('mainAudio');
       player.src = audioBlobUrls[idx];
-      player.playbackRate = parseFloat(document.getElementById('liveSpeedSelect').value);
+      player.playbackRate = serverState.settings.playbackRate;
 
       player.onended = () => {
-        if (!dictationState.isRunning || dictationState.isPaused) return;
+        if (!dictation.isRunning || dictation.isPaused) return;
 
-        const mult = serverState.settings.pauseMultiplier || 1.0;
-        const waitSeconds = Math.max(2, Math.round(chunk.pauseSeconds * mult));
-        let remainingSec = waitSeconds;
+        const waitSec = Math.max(1, Math.round(chunk.pauseSeconds * serverState.settings.pauseMultiplier));
+        let remain = waitSec;
+        banner.innerText = `✍️ 請默寫第 ${idx + 1} 組... (${remain}s)`;
 
-        banner.innerText = `✍️ 請默寫第 ${idx + 1} 組... (停頓倒數 ${remainingSec} 秒)`;
-
-        clearInterval(dictationState.pauseTimer);
-        dictationState.pauseTimer = setInterval(() => {
-          if (dictationState.isPaused || !dictationState.isRunning) {
-            clearInterval(dictationState.pauseTimer);
+        clearInterval(dictation.timer);
+        dictation.timer = setInterval(() => {
+          if (dictation.isPaused || !dictation.isRunning) {
+            clearInterval(dictation.timer);
             return;
           }
-          remainingSec--;
-          if (remainingSec > 0) {
-            banner.innerText = `✍️ 請默寫第 ${idx + 1} 組... (停頓倒數 ${remainingSec} 秒)`;
+          remain--;
+          if (remain > 0) {
+            banner.innerText = `✍️ 請默寫第 ${idx + 1} 組... (${remain}s)`;
           } else {
-            clearInterval(dictationState.pauseTimer);
-            // 判斷是否需要重複讀多一次，還是進入下一組
-            if (dictationState.currentReadPass < totalPasses) {
-              dictationState.currentReadPass++;
+            clearInterval(dictation.timer);
+            if (dictation.pass < totalPass) {
+              dictation.pass++;
             } else {
-              dictationState.currentChunkIdx++;
-              dictationState.currentReadPass = 1;
+              dictation.chunkIdx++;
+              dictation.pass = 1;
             }
-            runDictationStep();
+            runStep();
           }
         }, 1000);
       };
 
-      player.play().catch(err => {
-        banner.innerText = "⚠️ iOS 播放受阻，請再次點擊「▶ 繼續」解鎖音訊";
+      player.play().catch(() => {
+        banner.innerText = "⚠️ 點擊「繼續」解鎖 iOS 播放";
         pauseDictation();
       });
     }
 
     function pauseDictation() {
-      if (!dictationState.isRunning) return;
-      dictationState.isPaused = true;
-      clearInterval(dictationState.pauseTimer);
-      document.getElementById('mainAudioPlayer').pause();
+      if (!dictation.isRunning) return;
+      dictation.isPaused = true;
+      clearInterval(dictation.timer);
+      document.getElementById('mainAudio').pause();
 
-      const btnPlay = document.getElementById('btnPlayDictation');
-      btnPlay.innerText = "▶ 繼續讀默";
-      btnPlay.disabled = false;
-      document.getElementById('btnPauseDictation').disabled = true;
-      document.getElementById('dictationStatusBanner').innerText = "⏸ 讀默已暫停";
+      const btn = document.getElementById('btnPlay');
+      btn.innerText = "▶ 繼續";
+      btn.disabled = false;
+      document.getElementById('btnPause').disabled = true;
+      document.getElementById('statusBanner').innerText = "⏸ 讀默暫停";
     }
 
     function stopDictation() {
-      dictationState.isRunning = false;
-      dictationState.isPaused = false;
-      clearInterval(dictationState.pauseTimer);
+      dictation.isRunning = false;
+      dictation.isPaused = false;
+      clearInterval(dictation.timer);
 
-      const player = document.getElementById('mainAudioPlayer');
-      player.pause();
-      player.onended = null;
+      const p = document.getElementById('mainAudio');
+      p.pause();
+      p.onended = null;
 
-      const btnPlay = document.getElementById('btnPlayDictation');
-      btnPlay.innerText = "▶ 開始連續讀默";
-      btnPlay.disabled = !currentLesson;
-      document.getElementById('btnPauseDictation').disabled = true;
-      document.getElementById('btnStopDictation').disabled = true;
-      highlightActiveChunk(-1);
+      const btn = document.getElementById('btnPlay');
+      btn.innerText = "▶ 開始連續讀默";
+      btn.disabled = !currentLesson;
+      document.getElementById('btnPause').disabled = true;
+      document.getElementById('btnStop').disabled = true;
+      highlightChunk(-1);
     }
 
     function replayCurrentChunk() {
       if (!currentLesson) return;
-      clearInterval(dictationState.pauseTimer);
-      const idx = dictationState.currentChunkIdx || 0;
-      if (dictationState.isRunning) {
-        dictationState.isPaused = false;
-        runDictationStep();
+      clearInterval(dictation.timer);
+      if (dictation.isRunning) {
+        dictation.isPaused = false;
+        runStep();
       } else {
-        playSingleChunkPreview(idx);
+        playPreview(dictation.chunkIdx || 0);
       }
     }
 
-    function highlightActiveChunk(activeIdx) {
+    function highlightChunk(idx) {
       if (!currentLesson) return;
-      currentLesson.chunks.forEach((_, idx) => {
-        const el = document.getElementById(`chunk_card_${idx}`);
+      currentLesson.chunks.forEach((_, i) => {
+        const el = document.getElementById(`chunk_${i}`);
         if (el) {
-          if (idx === activeIdx) {
+          if (i === idx) {
             el.classList.add('active');
             el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           } else {
@@ -806,25 +714,139 @@
 
     /**
      * ========================================================================
-     * UI 切換與工具函數
+     * Key Modal 控制 (已設定則折疊為單行，點擊才展開)
      * ========================================================================
      */
-    function showAddPanel() {
-      document.getElementById('addLessonPanel').style.display = 'block';
-      document.getElementById('buildProgressBox').style.display = 'none';
+    function openKeyModal() {
+      renderKeyRows();
+      openModal('keyModal');
     }
 
-    function hideAddPanel() {
-      document.getElementById('addLessonPanel').style.display = 'none';
+    function renderKeyRows() {
+      const keysConfig = [
+        { id: 'GEMINI_API_KEY', label: 'Gemini API Key' },
+        { id: 'GOOGLE_TTS_KEY', label: 'Google Cloud TTS Key' },
+        { id: 'AZURE_TTS_KEY', label: 'Microsoft Azure TTS Key' },
+        { id: 'GITHUB_TOKEN', label: 'GitHub Personal Token' }
+      ];
+
+      const cont = document.getElementById('keyListContainer');
+      cont.innerHTML = keysConfig.map(k => {
+        const isSet = serverState.keyStatus[k.id];
+        if (isSet) {
+          return `
+            <div class="key-block">
+              <div class="key-header-row">
+                <span class="key-title">${k.label}</span>
+              </div>
+              <div class="key-sub-row">
+                <span class="badge-tag ok">✅ 已安全加密儲存</span>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:0.78rem;" onclick="revealKeyInput('${k.id}')">✏️ 更改</button>
+              </div>
+              <div id="wrapper_${k.id}" style="display:none; margin-top:8px;">
+                <input type="password" id="input_${k.id}" placeholder="輸入新金鑰以覆蓋">
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="key-block">
+              <div class="key-header-row">
+                <span class="key-title">${k.label}</span>
+                <span class="badge-tag warn">⚠️ 尚未設定</span>
+              </div>
+              <div style="margin-top:6px;">
+                <input type="password" id="input_${k.id}" placeholder="請在此貼上 API Key">
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
     }
 
-    function openModal(id) {
-      document.getElementById(id).style.display = 'flex';
+    function revealKeyInput(id) {
+      const wrap = document.getElementById(`wrapper_${id}`);
+      if (wrap) wrap.style.display = (wrap.style.display === 'none') ? 'block' : 'none';
     }
 
-    function closeModal(id) {
-      document.getElementById(id).style.display = 'none';
+    async function saveKeysToCloud() {
+      const btn = document.getElementById('btnSaveKeys');
+      btn.disabled = true;
+      btn.innerText = "儲存中...";
+
+      const keys = {};
+      ['GEMINI_API_KEY', 'GOOGLE_TTS_KEY', 'AZURE_TTS_KEY', 'GITHUB_TOKEN'].forEach(k => {
+        const inp = document.getElementById(`input_${k}`);
+        if (inp && inp.value.trim() !== '') keys[k] = inp.value.trim();
+      });
+
+      try {
+        serverState = await callGAS('saveKeys', { keys });
+        updateKeyDotAlert();
+        closeModal('keyModal');
+      } catch (e) {
+        alert("儲存金鑰失敗: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "💾 儲存並關閉";
+      }
     }
+
+    /**
+     * ========================================================================
+     * 系統設定 Modal 控制 (含步進器，關閉時才進行雲端同步)
+     * ========================================================================
+     */
+    function openSettingsModal() {
+      tempSettings = { ...serverState.settings };
+      document.getElementById('modalVoiceSelect').value = tempSettings.ttsVoice;
+      document.getElementById('modalModelSelect').value = tempSettings.geminiModel;
+
+      updateStepperUI('playbackRate', 2);
+      updateStepperUI('repeatCount', 0);
+      updateStepperUI('pauseMultiplier', 1);
+
+      openModal('settingsModal');
+    }
+
+    function stepVal(key, delta, min, max, fixedDigits) {
+      let val = tempSettings[key] + delta;
+      if (val < min) val = min;
+      if (val > max) val = max;
+      tempSettings[key] = parseFloat(val.toFixed(2));
+      updateStepperUI(key, fixedDigits);
+    }
+
+    function updateStepperUI(key, fixedDigits) {
+      const el = document.getElementById(`step_${key}`);
+      if (el) {
+        let displayVal = tempSettings[key];
+        el.value = (fixedDigits > 0) ? Number(displayVal).toFixed(fixedDigits) : displayVal;
+      }
+    }
+
+    async function closeSettingsModalAndSync() {
+      tempSettings.ttsVoice = document.getElementById('modalVoiceSelect').value;
+      tempSettings.geminiModel = document.getElementById('modalModelSelect').value;
+
+      closeModal('settingsModal');
+
+      try {
+        serverState = await callGAS('saveSettings', { settings: tempSettings });
+        applyPlaybackRateToPlayer();
+        renderChunks();
+      } catch (e) {
+        console.error("同步設定失敗:", e);
+      }
+    }
+
+    /**
+     * ========================================================================
+     * 工具函數
+     * ========================================================================
+     */
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
