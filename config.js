@@ -4,11 +4,11 @@
  */
 const APP_CONFIG = {
   // 1. 請貼上你部署後的 Google Apps Script 網頁應用程式網址 (以 /exec 結尾)
-  GAS_WEB_APP_URL: "https://script.google.com/macros/s/請替換為你的GAS部署ID/exec",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbxtgxe1J31xsxPWRLhoJ7szH_QwBKj26L11GPRaMqCZEti_9SuZZW-xKW7-LA50tmYA-w/exec",
 
   // 2. 專放 MP3 與 lesson_{id}.json 的 GitHub-assets 倉庫資料
   GITHUB: {
-    owner: "你的GitHub帳號名稱",      // 例如: "iamfungjerry"
+    owner: "iamfungjerry",      // 例如: "iamfungjerry"
     assetsRepo: "eng-dict-assets",  // 專放 MP3 的倉庫名稱
     branch: "main"                  // 預設分支名稱
   },
@@ -32,8 +32,9 @@ const APP_CONFIG = {
 
   // 5. 可供選擇的課文分拆 / OCR 模型清單
   GEMINI_MODELS: [
-    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (預設極速分拆 & OCR)" },
-    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (穩定備用版本)" },
-    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (高階語意分析)" }
+    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
+    { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash" },
+    { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
+    { id: "gemini-flash-latest", label: "Gemini Flash Latest" }
   ]
 };
