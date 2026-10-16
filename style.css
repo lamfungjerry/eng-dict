@@ -139,9 +139,9 @@ body {
 /* 步進器左右卡片式容器 */
 .stepper-cards-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 14px 0;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 14px 0 10px;
 }
 
 .stepper-mini-card {
@@ -169,6 +169,70 @@ body {
   justify-content: center;
   gap: 4px;
   width: 100%;
+}
+
+.stepper-mini-card.lock-card {
+  border-width: 2px;
+  transition: all 0.2s;
+}
+
+.stepper-mini-card.lock-card.is-locked {
+  background: #fef2f2;
+  border-color: #ef4444;
+}
+
+.stepper-mini-card.lock-card.is-unlocked {
+  background: #f0fdf4;
+  border-color: #22c55e;
+}
+
+.lock-action-btn {
+  width: 90%;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s;
+}
+
+.lock-action-btn.btn-to-unlock {
+  background: #ef4444;
+  color: #fff;
+}
+
+.lock-action-btn.btn-to-lock {
+  background: #16a34a;
+  color: #fff;
+}
+
+.lock-action-btn:active {
+  opacity: 0.8;
+}
+
+.btn-lock-all-devices {
+  width: 100%;
+  margin-bottom: 10px;
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1.5px solid #fecdd3;
+  padding: 11px 16px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-lock-all-devices:active {
+  background: #ffe4e6;
 }
 
 .stepper-btn {
