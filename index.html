@@ -145,20 +145,16 @@
       margin-bottom: 12px;
     }
 
-    .blank-lesson-box {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      height: 44px;
-      padding: 0 12px;
-      background: #f8fafc;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 0.95rem;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+    /* 下拉選單平時清空文字（點擊時才顯示內容） */
+    .lesson-select-blank {
+      color: transparent !important;
+    }
+    .lesson-select-blank:focus {
+      color: var(--text-main) !important;
+    }
+    #lessonDropdown option {
+      color: var(--text-main);
+      background: #fff;
     }
 
     .player-status-row {
@@ -501,14 +497,12 @@
 
     <!-- 視圖 B：播放介面 -->
     <section id="viewPlayer" class="card" style="display:none;">
+      <!-- 課文列：點擊時顯示文字，平時維持空白清空 -->
       <div id="catalogBar" class="lesson-select-bar">
-        <div id="lessonPickerBox" style="flex:1; display:none;">
-          <select id="lessonDropdown" onchange="onSelectLessonFromDropdown(this.value)" onblur="showLessonChosenView()"></select>
-        </div>
-        <div id="lessonChosenBox" style="flex:1; display:flex; align-items:center; gap:8px;">
-          <button id="btnReturnToPicker" class="icon-btn" onclick="showLessonDropdownPicker()" title="選擇課文">↩️</button>
-          <div id="blankLessonHeader" class="blank-lesson-box"></div>
-        </div>
+        <select id="lessonDropdown" class="lesson-select-blank" 
+                onchange="onSelectLessonFromDropdown(this.value); this.blur();" 
+                onfocus="this.classList.remove('lesson-select-blank')" 
+                onblur="updateLessonDropdownBlankState()"></select>
 
         <button class="icon-btn" onclick="switchView('ADD')" title="加入課文">➕</button>
         <button class="icon-btn" onclick="openLessonManageModal()" title="管理課文">📋</button>
@@ -554,15 +548,21 @@
         <button class="btn btn-outline" style="padding:10px 14px; white-space:nowrap;" onclick="saveLessonTitle()">儲存標題</button>
       </div>
 
-      <label>語音下載狀態:</label>
-      <div id="voiceManageListContainer" style="margin-bottom:16px;"></div>
+      <!-- 未下載語音列表 -->
+      <label>未下載語音:</label>
+      <div id="voicePendingListContainer" style="margin-bottom:12px;"></div>
 
+      <!-- 下載進度條 -->
       <div id="voiceDownloadProgressBox" style="display:none; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px; margin-bottom:14px;">
         <div id="voiceProgText" style="font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;">正在下載...</div>
         <div class="progress-bar-bg" style="margin:0 0 4px 0;">
           <div id="voiceProgBarFill" class="progress-bar-fill"></div>
         </div>
       </div>
+
+      <!-- 已下載語音列表（排在進度條之後） -->
+      <label>已下載語音:</label>
+      <div id="voiceDownloadedListContainer" style="margin-bottom:16px;"></div>
 
       <button class="btn btn-danger" style="width:100%; padding:12px;" onclick="deleteCurrentLesson()">
         🗑️ 刪除此課文
@@ -649,7 +649,7 @@
   <script>
     /**
      * ========================================================================
-     * 全域狀態與佇列
+     * 全域狀態
      * ========================================================================
      */
     const UNLOCK_STORAGE_KEY = 'dict_device_unlock_token';
@@ -677,9 +677,7 @@
 
     let isTextMasked = true;
     let selectedActiveIdx = -1;
-
-    let voiceDownloadQueue = [];
-    let isProcessingVoiceQueue = false;
+    let isVoiceDownloading = false; // 單一下載互斥鎖
 
     let dictation = {
       isRunning: false,
@@ -731,7 +729,6 @@
 
       await syncInitStateFromGAS();
       await loadCatalogFromGitHub();
-      document.getElementById('globalLoadingCard').style.display = 'none';
     };
 
     function populateConfigDropdowns() {
@@ -764,7 +761,7 @@
       try {
         json = JSON.parse(rawText);
       } catch (e) {
-        throw new Error(`連線回應異常 (${rawText.substring(0, 40)})`);
+        throw new Error("伺服器繁忙，請稍後重試");
       }
       if (!json.success) throw new Error(json.error || "系統連線異常");
       return json.data;
@@ -830,7 +827,7 @@
 
     /**
      * ========================================================================
-     * 畫面切換與課文選定狀態
+     * 畫面切換與下拉選單空白狀態控制
      * ========================================================================
      */
     function switchView(mode) {
@@ -844,6 +841,7 @@
         viewAdd.style.display = 'block';
         btnBack.style.display = (lessonsIndex.length > 0) ? 'inline-flex' : 'none';
         resetAddFormUI();
+        document.getElementById('globalLoadingCard').style.display = 'none';
       } else {
         viewAdd.style.display = 'none';
         viewPlay.style.display = 'block';
@@ -920,26 +918,13 @@
       });
     }
 
-    function showLessonDropdownPicker() {
-      if (lessonsIndex.length <= 1) return; // 只有一篇課文時禁止展開選單
-      document.getElementById('lessonPickerBox').style.display = 'block';
-      document.getElementById('lessonChosenBox').style.display = 'none';
-      document.getElementById('lessonDropdown').focus();
-    }
-
-    function showLessonChosenView() {
-      document.getElementById('lessonPickerBox').style.display = 'none';
-      document.getElementById('lessonChosenBox').style.display = 'flex';
-      renderBlankLessonHeader();
-    }
-
-    function renderBlankLessonHeader() {
-      const headerBox = document.getElementById('blankLessonHeader');
-      if (!currentLesson || !headerBox) return;
+    function updateLessonDropdownBlankState() {
+      const sel = document.getElementById('lessonDropdown');
+      if (!sel) return;
       if (isTextMasked) {
-        headerBox.innerText = '';
+        sel.classList.add('lesson-select-blank');
       } else {
-        headerBox.innerText = currentLesson.title;
+        sel.classList.remove('lesson-select-blank');
       }
     }
 
@@ -949,7 +934,7 @@
 
     /**
      * ========================================================================
-     * 課文結構生成 -> 進入管理畫面挑選下載語音
+     * 課文結構生成
      * ========================================================================
      */
     async function startBuildProcess() {
@@ -1000,7 +985,7 @@
 
     /**
      * ========================================================================
-     * 課文管理 Modal 與 背景自動排隊佇列
+     * 課文管理 Modal (逐個下載、鎖定互斥、已下載移至進度條後)
      * ========================================================================
      */
     function openLessonManageModal() {
@@ -1011,44 +996,48 @@
     }
 
     function renderVoiceManageList() {
-      const container = document.getElementById('voiceManageListContainer');
+      const pendingContainer = document.getElementById('voicePendingListContainer');
+      const downloadedContainer = document.getElementById('voiceDownloadedListContainer');
       const total = currentLesson.chunks ? currentLesson.chunks.length : 0;
       const voicesMap = currentLesson.voices || {};
 
-      container.innerHTML = APP_CONFIG.TTS_VOICES.map(v => {
+      const pendingHtml = [];
+      const downloadedHtml = [];
+
+      APP_CONFIG.TTS_VOICES.forEach(v => {
         const info = voicesMap[v.id];
         const isDownloaded = Boolean(info && info.downloaded);
-        const countText = `${total}/${total}`;
-        
-        let statusText = isDownloaded ? `✅ 已下載 ${countText}` : `❌ 未下載 0/${total}`;
-        let btnText = isDownloaded ? '重新下載' : '下載';
-        let btnClass = isDownloaded ? 'btn-outline' : 'btn-success';
 
-        if (voiceDownloadQueue.includes(v.id)) {
-          if (voiceDownloadQueue[0] === v.id) {
-            statusText = `⏳ 下載中 ${countText}`;
-            btnText = '下載中...';
-          } else {
-            statusText = `⏳ 排隊中...`;
-            btnText = '排隊中';
-          }
-          btnClass = 'btn-warning';
-        }
-
-        return `
-          <div class="voice-manage-item">
-            <div class="voice-manage-info">
-              <span class="voice-manage-name">${v.label}</span>
-              <span class="voice-manage-status">${statusText}</span>
+        if (isDownloaded) {
+          // 已下載：不提供重新下載，只顯示狀態
+          downloadedHtml.push(`
+            <div class="voice-manage-item">
+              <div class="voice-manage-info">
+                <span class="voice-manage-name">${v.label}</span>
+                <span class="voice-manage-status" style="color:var(--success);">✅ 已下載 ${total}/${total}</span>
+              </div>
             </div>
-            <button class="btn ${btnClass}" style="padding:6px 12px; font-size:0.8rem;" 
-                    onclick="enqueueVoiceDownload('${v.id}')"
-                    ${voiceDownloadQueue.includes(v.id) ? 'disabled' : ''}>
-              ${btnText}
-            </button>
-          </div>
-        `;
-      }).join('');
+          `);
+        } else {
+          // 未下載：提供下載按鈕，下載進行時鎖定按鈕
+          pendingHtml.push(`
+            <div class="voice-manage-item">
+              <div class="voice-manage-info">
+                <span class="voice-manage-name">${v.label}</span>
+                <span class="voice-manage-status">未下載 0/${total}</span>
+              </div>
+              <button class="btn btn-success" style="padding:6px 12px; font-size:0.8rem;" 
+                      onclick="downloadSingleVoice('${v.id}')"
+                      ${isVoiceDownloading ? 'disabled' : ''}>
+                下載
+              </button>
+            </div>
+          `);
+        }
+      });
+
+      pendingContainer.innerHTML = pendingHtml.length > 0 ? pendingHtml.join('') : '<div style="color:var(--text-sub); font-size:0.85rem; padding:4px 0;">所有語音模型均已下載</div>';
+      downloadedContainer.innerHTML = downloadedHtml.length > 0 ? downloadedHtml.join('') : '<div style="color:var(--text-sub); font-size:0.85rem; padding:4px 0;">尚未下載任何語音模型</div>';
     }
 
     async function saveLessonTitle() {
@@ -1069,7 +1058,6 @@
         currentLesson = data.lesson;
         lessonsIndex = data.indexList;
         renderCatalogDropdown();
-        renderBlankLessonHeader();
         renderChunks();
         progBox.style.display = 'none';
         alert("✅ 標題已修改");
@@ -1079,26 +1067,10 @@
       }
     }
 
-    function enqueueVoiceDownload(voiceId) {
-      if (voiceDownloadQueue.includes(voiceId)) return;
-      voiceDownloadQueue.push(voiceId);
-      renderVoiceManageList();
-
-      if (!isProcessingVoiceQueue) {
-        processVoiceQueue();
-      }
-    }
-
-    async function processVoiceQueue() {
-      if (voiceDownloadQueue.length === 0) {
-        isProcessingVoiceQueue = false;
-        document.getElementById('voiceDownloadProgressBox').style.display = 'none';
-        renderVoiceManageList();
-        return;
-      }
-
-      isProcessingVoiceQueue = true;
-      const voiceId = voiceDownloadQueue[0];
+    // 逐個下載語音 (鎖定其他按鈕)
+    async function downloadSingleVoice(voiceId) {
+      if (!currentLesson || isVoiceDownloading) return;
+      isVoiceDownloading = true;
       renderVoiceManageList();
 
       const progBox = document.getElementById('voiceDownloadProgressBox');
@@ -1157,8 +1129,9 @@
       } catch (err) {
         alert(`語音下載中斷: ` + err.message);
       } finally {
-        voiceDownloadQueue.shift();
-        processVoiceQueue();
+        isVoiceDownloading = false;
+        progBox.style.display = 'none';
+        renderVoiceManageList();
       }
     }
 
@@ -1201,12 +1174,7 @@
           ${escapeHtml(item.title)}
         </option>
       `).join('');
-
-      // 若課文只有一篇，隱藏返回重選按鈕；多於一篇才顯示
-      const btnReturn = document.getElementById('btnReturnToPicker');
-      if (btnReturn) {
-        btnReturn.style.display = (lessonsIndex.length > 1) ? 'inline-flex' : 'none';
-      }
+      updateLessonDropdownBlankState();
     }
 
     async function selectLesson(folderName) {
@@ -1229,8 +1197,10 @@
         currentLesson.folderName = folderName;
 
         renderCatalogDropdown();
-        showLessonChosenView();
         renderChunks();
+
+        // 只要 load 到課題與句子，立即隱藏全域「連線中...」遮罩！
+        document.getElementById('globalLoadingCard').style.display = 'none';
 
         Object.values(audioBlobUrls).forEach(u => URL.revokeObjectURL(u));
         audioBlobUrls = {};
@@ -1274,6 +1244,7 @@
         document.getElementById('btnReplay').disabled = false;
 
       } catch (err) {
+        document.getElementById('globalLoadingCard').style.display = 'none';
         banner.innerText = "❌ 載入失敗: " + err.message;
       }
     }
@@ -1386,7 +1357,7 @@
 
       const chunk = currentLesson.chunks[idx];
       const banner = document.getElementById('playerBanner');
-      const label = chunk.isTitle ? "課題 T for Title" : `第 ${chunk.index}/${total - 1} 句`;
+      const label = chunk.isTitle ? "課題" : `第 ${chunk.index}/${total - 1} 句`;
       banner.innerText = `🔊 朗讀中：${label} 第 ${dictation.pass}/${maxPasses} 次`;
 
       const player = document.getElementById('mainAudio');
@@ -1398,7 +1369,7 @@
 
         const mult = Number(serverState.settings.pauseMultiplier || 1.0);
         let remain = Math.max(1, Math.round(chunk.pauseSeconds * mult));
-        const waitLabel = chunk.isTitle ? "默寫課題 T for Title" : `默寫停頓中`;
+        const waitLabel = chunk.isTitle ? "默寫課題" : `默寫停頓中`;
         banner.innerText = `✍️ ${waitLabel} ${remain} 秒`;
 
         clearInterval(dictation.timer);
@@ -1585,7 +1556,7 @@
         eyeBtn.style.display = 'inline-flex';
         eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
       }
-      renderBlankLessonHeader();
+      updateLessonDropdownBlankState();
       renderChunks();
     }
 
