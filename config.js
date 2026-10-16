@@ -1,0 +1,39 @@
+/**
+ * 系統靜態連線與模型清單配置
+ * (所有動態設定如目前選用的語音、API Keys 均已跨平台儲存在 GAS 雲端)
+ */
+const APP_CONFIG = {
+  // 1. 請貼上你部署後的 Google Apps Script 網頁應用程式網址 (以 /exec 結尾)
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/請替換為你的GAS部署ID/exec",
+
+  // 2. 專放 MP3 與 lesson_{id}.json 的 GitHub-assets 倉庫資料
+  GITHUB: {
+    owner: "你的GitHub帳號名稱",      // 例如: "iamfungjerry"
+    assetsRepo: "eng-dict-assets",  // 專放 MP3 的倉庫名稱
+    branch: "main"                  // 預設分支名稱
+  },
+
+  // 3. 批次處理設定 (每批同時生成幾句 TTS，建議 5 句以兼顧極速與細膩進度條)
+  TTS_BATCH_SIZE: 5,
+
+  // 4. 可供選擇的 TTS 語音模型清單 (Azure en-HK + Google Chirp 3 HD en-US)
+  TTS_VOICES: [
+    { id: "en-HK-YanNeural", label: "🇭🇰 港澳英文女老師 - Yan (Azure Neural)", provider: "Azure" },
+    { id: "en-HK-SamNeural", label: "🇭🇰 港澳英文男老師 - Sam (Azure Neural)", provider: "Azure" },
+    { id: "en-US-Chirp3-HD-Aoede", label: "🇺🇸 美式自然女聲 - Aoede (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Kore", label: "🇺🇸 美式清晰女聲 - Kore (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Leda", label: "🇺🇸 美式溫柔女聲 - Leda (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Zephyr", label: "🇺🇸 美式輕快女聲 - Zephyr (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Puck", label: "🇺🇸 美式活力男聲 - Puck (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Charon", label: "🇺🇸 美式沉穩男聲 - Charon (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Fenrir", label: "🇺🇸 美式渾厚男聲 - Fenrir (Google Chirp 3 HD)", provider: "Google" },
+    { id: "en-US-Chirp3-HD-Orus", label: "🇺🇸 美式標準男聲 - Orus (Google Chirp 3 HD)", provider: "Google" }
+  ],
+
+  // 5. 可供選擇的課文分拆 / OCR 模型清單
+  GEMINI_MODELS: [
+    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (預設極速分拆 & OCR)" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (穩定備用版本)" },
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (高階語意分析)" }
+  ]
+};
