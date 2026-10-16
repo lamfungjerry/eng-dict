@@ -111,9 +111,9 @@
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0;">
         <div id="playerBanner" style="font-size:0.88rem; font-weight:600; color:var(--primary);">準備中...</div>
-        <!-- 預設勾選隱藏文字 (checked) -->
-        <label style="margin:0; font-size:0.84rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
-          <input type="checkbox" id="maskTextCheckbox" onchange="renderChunks()" checked> 🙈 隱藏文字
+        <!-- 隱藏文字開關 (預設勾選，本機鎖定時禁止取消勾選) -->
+        <label id="maskLabelContainer" style="margin:0; font-size:0.84rem; display:flex; align-items:center; gap:5px; cursor:pointer;">
+          <input type="checkbox" id="maskTextCheckbox" onchange="renderChunks()" checked> 🙈 隱藏文字 <span id="maskLockIndicator" style="display:none; font-size:0.8rem;">🔒</span>
         </label>
       </div>
 
@@ -179,7 +179,9 @@
         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
       </select>
 
+      <!-- 2x2 卡片區 -->
       <div class="stepper-cards-row">
+        <!-- 卡片 1: 播放語速 -->
         <div class="stepper-mini-card">
           <div class="stepper-mini-title">播放語速</div>
           <div class="stepper-control">
@@ -189,6 +191,7 @@
           </div>
         </div>
 
+        <!-- 卡片 2: 朗讀次數 -->
         <div class="stepper-mini-card">
           <div class="stepper-mini-title">朗讀次數</div>
           <div class="stepper-control">
@@ -198,6 +201,7 @@
           </div>
         </div>
 
+        <!-- 卡片 3: 停頓倍率 -->
         <div class="stepper-mini-card">
           <div class="stepper-mini-title">停頓倍率</div>
           <div class="stepper-control">
@@ -206,9 +210,24 @@
             <button type="button" class="stepper-btn" onclick="stepSetting('pauseMultiplier', -0.1, 0.5, 2.0, 1)">－</button>
           </div>
         </div>
+
+        <!-- 卡片 4: 本機顯示文字鎖定/解鎖 -->
+        <div id="cardTextLock" class="stepper-mini-card lock-card is-locked">
+          <div id="cardTextLockTitle" class="stepper-mini-title" style="color:#dc2626;">顯示文字</div>
+          <div class="stepper-control">
+            <button type="button" id="btnToggleLock" class="lock-action-btn btn-to-unlock" onclick="handleLockToggle()">
+              解鎖
+            </button>
+          </div>
+        </div>
       </div>
 
-      <button id="btnSettingsSubmit" class="btn" style="width:100%; margin-top:8px;" onclick="onSettingsModalSubmit()">
+      <!-- 整行按鈕：一鍵鎖定全屋所有裝置 (只在本機已解鎖時出現) -->
+      <button type="button" id="btnRevokeAllLocks" class="btn-lock-all-devices" onclick="handleRevokeAllDevices()">
+        🔒 一鍵鎖定所有裝置
+      </button>
+
+      <button id="btnSettingsSubmit" class="btn" style="width:100%; margin-top:4px;" onclick="onSettingsModalSubmit()">
         關閉
       </button>
     </div>
@@ -217,9 +236,11 @@
   <script>
     /**
      * ========================================================================
-     * 全域狀態
+     * 全域狀態与常數
      * ========================================================================
      */
+    const UNLOCK_STORAGE_KEY = 'dict_device_unlock_token';
+
     let serverState = {
       keyStatus: {},
       settings: {
@@ -230,7 +251,8 @@
         pauseMultiplier: 1.0
       },
       pendingTask: null,
-      systemPrompt: ''
+      systemPrompt: '',
+      unlockToken: null
     };
 
     let draftSettings = {};
@@ -269,10 +291,144 @@
 
     /**
      * ========================================================================
+     * 本機與跨裝置「顯示文字」鎖定控制邏輯
+     * ========================================================================
+     */
+    function isDeviceUnlocked() {
+      const savedToken = localStorage.getItem(UNLOCK_STORAGE_KEY);
+      if (!savedToken) return false;
+      // 如已從 GAS 取得最新 token，必須完全吻合才算有效
+      if (serverState.unlockToken) {
+        return savedToken === serverState.unlockToken;
+      }
+      return true;
+    }
+
+    // 每次進入系統與 GAS 同步後，驗證本機解鎖狀態是否已被遠端撤銷
+    function reconcileUnlockTokenWithServer() {
+      const savedToken = localStorage.getItem(UNLOCK_STORAGE_KEY);
+      if (savedToken && serverState.unlockToken && savedToken !== serverState.unlockToken) {
+        // 通行證不吻合：徹底清空本機已解鎖狀態，等同從未解鎖過
+        localStorage.removeItem(UNLOCK_STORAGE_KEY);
+      }
+      updateLockCardUI();
+      updateMaskCheckboxState();
+    }
+
+    function updateLockCardUI() {
+      const unlocked = isDeviceUnlocked();
+      const card = document.getElementById('cardTextLock');
+      const titleEl = document.getElementById('cardTextLockTitle');
+      const btn = document.getElementById('btnToggleLock');
+      const btnRevokeAll = document.getElementById('btnRevokeAllLocks');
+      if (!card || !btn) return;
+
+      if (unlocked) {
+        card.className = "stepper-mini-card lock-card is-unlocked";
+        titleEl.style.color = "#16a34a";
+        btn.className = "lock-action-btn btn-to-lock";
+        btn.innerText = "鎖定";
+        // 已解鎖狀態下，才顯示整行的「一鍵鎖定所有裝置」按鈕
+        if (btnRevokeAll) btnRevokeAll.style.display = 'inline-flex';
+      } else {
+        card.className = "stepper-mini-card lock-card is-locked";
+        titleEl.style.color = "#dc2626";
+        btn.className = "lock-action-btn btn-to-unlock";
+        btn.innerText = "解鎖";
+        if (btnRevokeAll) btnRevokeAll.style.display = 'none';
+      }
+    }
+
+    function updateMaskCheckboxState() {
+      const checkbox = document.getElementById('maskTextCheckbox');
+      const lockIcon = document.getElementById('maskLockIndicator');
+      if (!checkbox) return;
+
+      const unlocked = isDeviceUnlocked();
+      if (!unlocked) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+        if (lockIcon) lockIcon.style.display = 'inline';
+      } else {
+        checkbox.disabled = false;
+        if (lockIcon) lockIcon.style.display = 'none';
+      }
+      renderChunks();
+    }
+
+    async function handleLockToggle() {
+      const unlocked = isDeviceUnlocked();
+      const btn = document.getElementById('btnToggleLock');
+
+      if (unlocked) {
+        // 由已解鎖變成已上鎖：無需密碼，徹底清空本機紀錄（等同從未成功解鎖過）
+        localStorage.removeItem(UNLOCK_STORAGE_KEY);
+        updateLockCardUI();
+        updateMaskCheckboxState();
+      } else {
+        // 由已上鎖變成解鎖：需輸入密碼向 GAS 驗證
+        const pwd = window.prompt("請輸入解鎖密碼：");
+        if (pwd === null || pwd.trim() === '') return;
+
+        const origText = btn.innerText;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="loading-hourglass">⏳</span>`;
+
+        try {
+          const res = await callGAS('verifyUnlockPassword', { password: pwd });
+          if (res.valid && res.unlockToken) {
+            serverState.unlockToken = res.unlockToken;
+            localStorage.setItem(UNLOCK_STORAGE_KEY, res.unlockToken);
+            updateLockCardUI();
+            updateMaskCheckboxState();
+          } else if (res.lockedOut) {
+            alert(`⛔ 密碼錯誤次數過多，請等待 ${res.remainSec} 秒後再試！`);
+          } else {
+            alert(`❌ 密碼錯誤！（尚餘 ${res.remainingAttempts} 次嘗試機會）`);
+          }
+        } catch (e) {
+          alert("驗證失敗: " + e.message);
+        } finally {
+          btn.disabled = false;
+          updateLockCardUI();
+        }
+      }
+    }
+
+    // 一鍵鎖定全屋所有裝置
+    async function handleRevokeAllDevices() {
+      if (!confirm("確定要一鍵鎖定所有裝置嗎？\n（包括本機及所有已解鎖的手機進入系統後都會自動上鎖）")) return;
+
+      const btn = document.getElementById('btnRevokeAllLocks');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-hourglass">⏳</span> 正在鎖定所有裝置...`;
+
+      try {
+        const res = await callGAS('revokeAllDevices');
+        serverState.unlockToken = res.unlockToken;
+        // 同時徹底清空本機解鎖紀錄
+        localStorage.removeItem(UNLOCK_STORAGE_KEY);
+        updateLockCardUI();
+        updateMaskCheckboxState();
+        alert("🔒 已成功鎖定所有裝置！");
+      } catch (e) {
+        alert("操作失敗: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `🔒 一鍵鎖定所有裝置`;
+        updateLockCardUI();
+      }
+    }
+
+    /**
+     * ========================================================================
      * 初始化
      * ========================================================================
      */
     window.onload = async function() {
+      updateLockCardUI();
+      updateMaskCheckboxState();
+
       await syncInitStateFromGAS();
       await loadCatalogFromGitHub();
       document.getElementById('globalLoadingCard').style.display = 'none';
@@ -292,6 +448,7 @@
     async function syncInitStateFromGAS() {
       try {
         serverState = await callGAS('getInitState');
+        reconcileUnlockTokenWithServer();
         refreshKeyAlertDot();
         applyBrowserPlaybackRate();
 
@@ -487,7 +644,6 @@
       await callGAS('discardPendingTask');
     }
 
-    // 斷點續傳執行器：即時同步進度數字
     async function continuePipelineFromCheckpoint() {
       if (!activeTaskState) return;
       document.getElementById('btnResumeOnError').style.display = 'none';
@@ -607,7 +763,6 @@
       }
     }
 
-    // 課文下拉選單：移除組數顯示
     function renderCatalogDropdown() {
       const sel = document.getElementById('lessonDropdown');
       sel.innerHTML = lessonsIndex.map(item => `
@@ -622,6 +777,10 @@
       const banner = document.getElementById('playerBanner');
       banner.innerHTML = `<span class="loading-hourglass">⏳</span> 正在載入音檔...`;
       document.getElementById('btnPlay').disabled = true;
+
+      // 切換課文時預設為隱藏文字，並根據本機鎖定狀態控制可否取消勾選
+      document.getElementById('maskTextCheckbox').checked = true;
+      updateMaskCheckboxState();
 
       try {
         const res = await fetch(getRawUrl(`lessons/lesson_${lessonId}.json`));
@@ -672,7 +831,11 @@
       }
     }
 
-    // 意群清單：區分題目與一般句子
+    // 漏洞 3 防護：隱藏文字時直接將底層英文字母與數字替換為圓點，杜絕頁內搜尋與複製偷看
+    function maskEnglishChars(str) {
+      return escapeHtml(String(str).replace(/[a-zA-Z0-9]/g, '●'));
+    }
+
     function renderChunks() {
       const cont = document.getElementById('chunkListContainer');
       if (!currentLesson) { cont.innerHTML = ''; return; }
@@ -683,7 +846,8 @@
       cont.innerHTML = currentLesson.chunks.map((c, idx) => {
         const waitSec = Math.max(1, Math.round(c.pauseSeconds * mult));
         const isActive = dictation.isRunning && dictation.chunkIdx === idx;
-        const displayText = c.isTitle ? `📌 題目：${escapeHtml(c.text)}` : `${c.index}. ${escapeHtml(c.text)}`;
+        const contentStr = isMasked ? maskEnglishChars(c.text) : escapeHtml(c.text);
+        const displayText = c.isTitle ? `📌 題目：${contentStr}` : `${c.index}. ${contentStr}`;
         return `
           <div id="chunk_row_${idx}" class="chunk-card ${isActive ? 'active' : ''}" onclick="playSinglePreview(${idx})">
             <span class="chunk-text ${isMasked ? 'masked' : ''}">${displayText}</span>
@@ -997,6 +1161,7 @@
       refreshMiniStepperDisplay('repeatCount', 0);
       refreshMiniStepperDisplay('pauseMultiplier', 1);
 
+      updateLockCardUI();
       openModal('settingsModal');
     }
 
@@ -1055,7 +1220,7 @@
 
     /**
      * ========================================================================
-     * 通用工具函數
+     * 工具函數
      * ========================================================================
      */
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
