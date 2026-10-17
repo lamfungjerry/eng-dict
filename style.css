@@ -109,12 +109,10 @@ body {
   font-weight: 700;
 }
 
-/* ==========================================================================
-   吸頂固定控制面板 (卡片模式下滾動永遠置頂)
-   ========================================================================== */
+/* 吸頂固定控制面板 */
 .player-controls-sticky-panel {
   position: sticky;
-  top: 58px; /* 接在頂部導航列下方 */
+  top: 58px;
   z-index: 90;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(10px);
@@ -125,7 +123,6 @@ body {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
 }
 
-/* 消除原播放容器外框，避免卡片模式雙重外框 */
 #viewPlayer.card {
   padding: 0;
   background: transparent;
@@ -133,7 +130,7 @@ body {
   box-shadow: none;
 }
 
-/* 兩階段選課條 (全寬大按鈕) */
+/* 兩階段選課條 */
 .lesson-picker-card {
   margin-bottom: 12px;
 }
@@ -189,48 +186,76 @@ body {
 }
 
 /* ==========================================================================
-   餘光感知大看板：高度嚴格鎖定，零版面抖動
+   餘光感知看板與動態變色層 (Chroma-Cueing & Reading Progress)
    ========================================================================== */
 .glance-banner {
+  position: relative;
+  overflow: hidden; /* 切齊內部進度條圓角 */
   border-radius: var(--radius-lg);
   padding: 8px 12px;
   margin-bottom: 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   transition: background-color 0.3s ease, color 0.3s ease;
   user-select: none;
-  /* 模式 A：高度鎖定為 106px，切換狀態時按鈕絕對不上下跳移 */
   height: 106px;
   min-height: 106px;
   max-height: 106px;
   box-sizing: border-box;
 }
 
-/* 狀態顏色：就緒 */
+/* 朗讀中底色層 (自左至右由淺藍推進至深藍) */
+.glance-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0%;
+  background-color: #1e40af; /* 深冷藍色 (推進色) */
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes readingProgressFill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* 內容文字層 (置於進度條之上) */
+.glance-banner-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 看板狀態底色 */
 .glance-banner.status-idle {
   background-color: #f1f5f9;
   color: var(--text-sub);
   border: 1px solid var(--border);
 }
 
-/* 狀態顏色：朗讀中 (冷藍色) */
+/* 朗讀中底色：淺亮冷藍色 (未推進部分) */
 .glance-banner.status-reading {
-  background-color: #1e40af;
+  background-color: #3b82f6; 
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(30, 64, 175, 0.25);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
 }
 
-/* 狀態顏色：停頓默寫中 (高警示暖橙色) */
+/* 停頓默寫中：暖橙色 */
 .glance-banner.status-writing {
   background-color: #d97706;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(217, 119, 6, 0.25);
 }
 
-/* 狀態顏色：暫停 */
+/* 暫停狀態 */
 .glance-banner.status-paused {
   background-color: #475569;
   color: #ffffff;
@@ -246,7 +271,6 @@ body {
   text-overflow: ellipsis;
 }
 
-/* 固定高度中央展示槽 (在朗讀圖示與倒數數字之間切換，高度恆定) */
 .glance-center-slot {
   height: 46px;
   display: flex;
@@ -366,7 +390,7 @@ body {
   pointer-events: none;
 }
 
-/* 次要切換工具列 (桌面遙控器模式 / 語音選擇) */
+/* 次要切換工具列 */
 .sub-toolbar {
   display: flex;
   align-items: center;
@@ -458,7 +482,7 @@ body {
 }
 
 /* ==========================================================================
-   模式 B：桌面遙控器模式 (Zen Mode / Remote Mode)
+   桌面遙控器模式 (Zen Mode / Remote Mode)
    ========================================================================== */
 body.zen-mode .top-nav {
   padding: 8px 16px;
@@ -486,7 +510,6 @@ body.zen-mode .player-controls-sticky-panel {
   background: var(--card-bg);
 }
 
-/* 遙控器模式下看板高度嚴格鎖定為 210px */
 body.zen-mode .glance-banner {
   height: 210px;
   min-height: 210px;
@@ -644,7 +667,7 @@ body.zen-mode .btn-nav-step {
   outline: none;
 }
 
-/* 鎖定／解鎖狀態專用按鈕 (34px 高度對齊加減按鈕) */
+/* 鎖定／解鎖狀態專用按鈕 */
 .btn-lock-status {
   height: 34px;
   min-width: 86px;
@@ -662,7 +685,6 @@ body.zen-mode .btn-nav-step {
   transition: all 0.2s ease;
 }
 
-/* 已解鎖狀態：柔和淺綠底、深綠字與綠框 */
 .btn-lock-status.unlocked {
   background-color: #dcfce7;
   color: #15803d;
@@ -673,7 +695,6 @@ body.zen-mode .btn-nav-step {
   background-color: #bbf7d0;
 }
 
-/* 已鎖定狀態：柔和淺紅底、深紅字與紅框 */
 .btn-lock-status.locked {
   background-color: #fee2e2;
   color: #b91c1c;
