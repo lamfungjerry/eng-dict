@@ -185,7 +185,7 @@ body {
 
 /* 句子列表容器：強制垂直單欄排列 */
 .chunk-grid {
-  display: flex !important;
+  display: flex;
   flex-direction: column !important;
   gap: 8px;
   margin-top: 12px;
