@@ -186,11 +186,11 @@ body {
 }
 
 /* ==========================================================================
-   餘光感知看板與動態變色層 (Chroma-Cueing & Reading Progress)
+   餘光感知看板與硬體加速進度條
    ========================================================================== */
 .glance-banner {
   position: relative;
-  overflow: hidden; /* 切齊內部進度條圓角 */
+  overflow: hidden;
   border-radius: var(--radius-lg);
   padding: 8px 12px;
   margin-bottom: 10px;
@@ -206,24 +206,20 @@ body {
   box-sizing: border-box;
 }
 
-/* 朗讀中底色層 (自左至右由淺藍推進至深藍) */
+/* 朗讀中動態變色層 (深冷藍，寬度由 JS 實時硬體時鐘驅動) */
 .glance-progress-fill {
   position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
   width: 0%;
-  background-color: #1e40af; /* 深冷藍色 (推進色) */
+  background-color: #1e40af;
   z-index: 1;
   pointer-events: none;
+  will-change: width;
 }
 
-@keyframes readingProgressFill {
-  from { width: 0%; }
-  to { width: 100%; }
-}
-
-/* 內容文字層 (置於進度條之上) */
+/* 看板文字與圖示內容 (置頂) */
 .glance-banner-content {
   position: relative;
   z-index: 2;
@@ -234,16 +230,16 @@ body {
   justify-content: center;
 }
 
-/* 看板狀態底色 */
+/* 看板底色 */
 .glance-banner.status-idle {
   background-color: #f1f5f9;
   color: var(--text-sub);
   border: 1px solid var(--border);
 }
 
-/* 朗讀中底色：淺亮冷藍色 (未推進部分) */
+/* 朗讀中底色：淺冷藍 (未推進部分) */
 .glance-banner.status-reading {
-  background-color: #3b82f6; 
+  background-color: #3b82f6;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
 }
@@ -482,7 +478,7 @@ body {
 }
 
 /* ==========================================================================
-   桌面遙控器模式 (Zen Mode / Remote Mode)
+   模式 B：桌面遙控器模式 (Zen Mode / Remote Mode)
    ========================================================================== */
 body.zen-mode .top-nav {
   padding: 8px 16px;
