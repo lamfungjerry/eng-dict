@@ -464,7 +464,7 @@
       const container = document.getElementById('chunkListContainer');
       const btn = document.getElementById('btnCardsToggle');
       if (container) {
-        container.style.display = isCardsVisible ? 'flex' : 'none';
+        container.style.setProperty('display', isCardsVisible ? 'flex' : 'none', 'important');
       }
       if (btn) {
         btn.style.opacity = isCardsVisible ? '1' : '0.4';
