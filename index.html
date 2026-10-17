@@ -103,7 +103,7 @@
           <button id="btnNext" class="btn btn-outline" onclick="handleNextChunk()" disabled>⏭ 下一句</button>
         </div>
 
-        <!-- 音訊條 + 卡片切換按鈕（無權限限制） + 文字隱藏切換按鈕（已解鎖才顯示） -->
+        <!-- 播放器 + 課文卡片切換 (🗂️) + 隱藏文字切換 (👁️) -->
         <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
           <audio id="mainAudio" playsinline controls style="flex:1; height:36px; outline:none; min-width:0;"></audio>
           
@@ -276,11 +276,14 @@
     let lessonsIndex = [];
     let currentLesson = null;
     let audioBlobUrls = {};
+    let audioLoadTaskId = 0; // 防止切換語音產生競態
 
     let isTextMasked = true;
-    let isCardsVisible = true; // 卡片顯示/隱藏狀態
+    let isCardsVisible = true;
     let selectedActiveIdx = -1;
     let isVoiceDownloading = false;
+
+    let wakeLockSentinel = null; // 螢幕常亮鎖
 
     let dictation = {
       isRunning: false,
@@ -305,6 +308,39 @@
         }
         if (keepAliveCtx.state === 'suspended') keepAliveCtx.resume();
       } catch (e) {}
+    }
+
+    // 停頓最後 1 秒微音效提示 (660Hz 輕柔提示音)
+    function playBeepCue() {
+      try {
+        if (!keepAliveCtx) return;
+        const osc = keepAliveCtx.createOscillator();
+        const gain = keepAliveCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, keepAliveCtx.currentTime);
+        gain.gain.setValueAtTime(0.04, keepAliveCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, keepAliveCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(keepAliveCtx.destination);
+        osc.start();
+        osc.stop(keepAliveCtx.currentTime + 0.08);
+      } catch (e) {}
+    }
+
+    // 手機螢幕常亮控制
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+        } catch (e) {}
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLockSentinel) {
+        try { wakeLockSentinel.release(); } catch (e) {}
+        wakeLockSentinel = null;
+      }
     }
 
     function safeBack() {
@@ -348,7 +384,7 @@
 
       (async () => {
         try {
-          const [initRes, catalogRes] = await Promise.allSettled([
+          const [initRes] = await Promise.allSettled([
             syncInitStateFromGAS(),
             loadCatalogFromGitHub()
           ]);
@@ -427,11 +463,6 @@
       return `${gender}-${name}`;
     }
 
-    function getVoiceFullLabel(voiceId) {
-      const item = APP_CONFIG.TTS_VOICES.find(v => v.id === voiceId);
-      return item ? item.label : voiceId;
-    }
-
     function updateVoiceBadge() {
       const badge = document.getElementById('currentVoiceBadge');
       if (!badge || !currentLesson) return;
@@ -454,11 +485,6 @@
       }
     }
 
-    /**
-     * ========================================================================
-     * 卡片顯示/隱藏切換 (無任何權限限制)
-     * ========================================================================
-     */
     function toggleCardsDisplay() {
       isCardsVisible = !isCardsVisible;
       const container = document.getElementById('chunkListContainer');
@@ -473,7 +499,7 @@
 
     /**
      * ========================================================================
-     * 課文專屬語音選擇 Modal (按 config.js 順序排，全下載完成隱藏按鈕)
+     * 課文專屬語音選擇 Modal (按 config.js 順序排)
      * ========================================================================
      */
     function openVoicePickerModal() {
@@ -544,7 +570,7 @@
 
     /**
      * ========================================================================
-     * 畫面切換與下拉選單空白狀態控制
+     * 畫面切換與下拉選單
      * ========================================================================
      */
     function switchView(mode) {
@@ -649,6 +675,41 @@
       selectLesson(folderName);
     }
 
+    // 輕量 Canvas 相片壓縮 (長邊最大 1280px, JPEG 0.8)
+    function compressImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 1280;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            resolve(dataUrl.split(',')[1]);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
     /**
      * ========================================================================
      * 課文結構生成
@@ -671,8 +732,8 @@
           directJson = jsonText;
         } else if (fileInput.files && fileInput.files.length > 0) {
           const f = fileInput.files[0];
-          imageMimeType = f.type;
-          imageBase64 = await fileToBase64(f);
+          imageMimeType = 'image/jpeg';
+          imageBase64 = await compressImageFile(f);
         }
 
         const data = await callGAS('step1_createLessonFast', {
@@ -793,7 +854,7 @@
       try {
         const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
         const data = await callGAS('updateLessonTitle', {
-          payload: { oldFolderName: targetFolder, newTitle: newTitle, ghConfig: APP_CONFIG.GITHUB }
+          payload: { folderName: targetFolder, newTitle: newTitle, ghConfig: APP_CONFIG.GITHUB }
         });
         currentLesson = data.lesson;
         lessonsIndex = data.indexList;
@@ -816,7 +877,7 @@
 
       const chunks = currentLesson.chunks;
       const total = chunks.length;
-      const batchSize = APP_CONFIG.TTS_BATCH_SIZE || 5;
+      const batchSize = APP_CONFIG.TTS_BATCH_SIZE || 20; // 批次提升至 20
       const allVoiceBlobs = [];
       const targetFolder = currentLesson.folderName || sanitizeFileName(currentLesson.title);
 
@@ -991,6 +1052,7 @@
 
     async function reloadAudioForCurrentLesson() {
       if (!currentLesson) return;
+      const myTaskId = ++audioLoadTaskId;
       const banner = document.getElementById('playerBanner');
       banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔...`;
 
@@ -1026,10 +1088,14 @@
           blobUrl = fb.audioData;
         }
 
+        if (myTaskId !== audioLoadTaskId) return;
+
         audioBlobUrls[chunk.index] = blobUrl;
         loaded++;
         banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔 ${loaded}/${total}...`;
       }));
+
+      if (myTaskId !== audioLoadTaskId) return;
 
       banner.innerText = `✅ 已就緒`;
       document.getElementById('btnPlay').disabled = false;
@@ -1042,7 +1108,7 @@
       const cont = document.getElementById('chunkListContainer');
       if (!currentLesson) { cont.innerHTML = ''; return; }
 
-      cont.style.display = isCardsVisible ? 'flex' : 'none';
+      cont.style.setProperty('display', isCardsVisible ? 'flex' : 'none', 'important');
 
       const mult = Number(serverState.settings.pauseMultiplier || 1.0);
 
@@ -1065,7 +1131,6 @@
       }).join('');
     }
 
-    // 點擊卡片：同上一句/下一句一樣，如果正處於連續播放模式，直接換句並繼續跑連續讀默
     function onChunkCardClicked(idx) {
       if (!currentLesson) return;
       navigateChunk(idx);
@@ -1119,13 +1184,11 @@
       updateNavButtonsState();
 
       if (dictation.isRunning) {
-        // 連續播放模式中：即時切換目標句子，並維持連續讀默規則運行
         dictation.isPaused = false;
         document.getElementById('btnPlay').disabled = true;
         document.getElementById('btnPause').disabled = false;
         runDictationCycle();
       } else {
-        // 非連續播放模式：單句預覽，播完即止
         playSingleChunkAudio(targetIdx);
       }
     }
@@ -1143,6 +1206,7 @@
     function handleStartOrResumeDictation() {
       if (!currentLesson) return;
       ensureIosAudioKeepAlive();
+      requestWakeLock(); // 啟動螢幕常亮
 
       if (dictation.isRunning && dictation.isPaused) {
         dictation.isPaused = false;
@@ -1183,6 +1247,7 @@
         dictation.isRunning = false;
         dictation.isPaused = false;
         clearInterval(dictation.timer);
+        releaseWakeLock(); // 讀默完成釋放常亮鎖
 
         selectedActiveIdx = 0;
         dictation.chunkIdx = 0;
@@ -1230,6 +1295,10 @@
           remain--;
           if (remain > 0) {
             banner.innerText = `✍️ ${waitLabel} ${remain} 秒`;
+            // 最後 1 秒發出微音效提示
+            if (remain === 1) {
+              playBeepCue();
+            }
           } else {
             clearInterval(dictation.timer);
             if (dictation.pass < maxPasses) {
@@ -1253,6 +1322,7 @@
       if (!dictation.isRunning) return;
       dictation.isPaused = true;
       clearInterval(dictation.timer);
+      releaseWakeLock(); // 暫停時釋放常亮鎖
       document.getElementById('mainAudio').pause();
 
       const btn = document.getElementById('btnPlay');
@@ -1266,6 +1336,7 @@
       dictation.isRunning = false;
       dictation.isPaused = false;
       clearInterval(dictation.timer);
+      releaseWakeLock(); // 停止時釋放常亮鎖
 
       const player = document.getElementById('mainAudio');
       player.pause();
@@ -1281,6 +1352,7 @@
       if (!currentLesson) return;
       stopDictation();
       ensureIosAudioKeepAlive();
+      requestWakeLock();
 
       selectedActiveIdx = 0;
       dictation.chunkIdx = 0;
@@ -1477,7 +1549,7 @@
 
     /**
      * ========================================================================
-     * Key Modal 控制 (已設定 badge 與 input box 互斥顯示)
+     * Key Modal 控制
      * ========================================================================
      */
     function openKeyModal() {
@@ -1653,15 +1725,6 @@
       if (!anyOpen) {
         document.body.style.overflow = '';
       }
-    }
-
-    function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
     }
 
     function escapeHtml(str) {
