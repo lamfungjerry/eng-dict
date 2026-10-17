@@ -85,7 +85,7 @@
           </div>
         </div>
 
-        <!-- 階段二：默書進行階段鎖定標籤 (方案2：遮蔽時防偷看題目，解鎖時還原課名) -->
+        <!-- 階段二：默書進行階段鎖定標籤 (方案 2：防偷看聯動標題) -->
         <div id="lessonRunningLock" class="lesson-locked-banner" style="display:none; margin-bottom:12px;">
           <span id="lessonRunningTitleText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">✍️ 默書進行中</span>
           <button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; background:white;" onclick="stopDictation(true)">
@@ -93,12 +93,12 @@
           </button>
         </div>
 
-        <!-- 餘光感知大看板 (含朗讀漸進式動態變色層) -->
+        <!-- 餘光感知大看板 (含硬體同步動態推進層) -->
         <div id="glanceBanner" class="glance-banner status-idle">
           <!-- 朗讀動態推進層 (深冷藍) -->
           <div id="glanceProgressFill" class="glance-progress-fill"></div>
 
-          <!-- 看板文字與圖示內容 (Z-index 置頂) -->
+          <!-- 看板文字與圖示內容 (置頂) -->
           <div class="glance-banner-content">
             <div id="glanceStatusTitle" class="glance-status-title">準備就緒</div>
             <div class="glance-center-slot">
@@ -302,6 +302,7 @@
      */
     const UNLOCK_STORAGE_KEY = 'dict_device_unlock_token';
     let initPromise = null;
+    let progressRafId = null; // 朗讀實時進度動畫幀 ID
 
     let serverState = {
       keyStatus: {},
@@ -411,6 +412,7 @@
       });
 
       populateConfigDropdowns();
+      syncCardVisibilityWithLock();
       updateLockCardUI();
       updateEyeBtnUI();
       applyBrowserPlaybackRate();
@@ -511,11 +513,64 @@
       }
     }
 
+    /**
+     * ========================================================================
+     * 解鎖與卡片模式聯動 (未解鎖預設隱藏卡片，已解鎖預設顯示)
+     * ========================================================================
+     */
+    function syncCardVisibilityWithLock() {
+      const unlocked = isDeviceUnlocked();
+      const btn = document.getElementById('btnZenToggle');
+      if (!unlocked) {
+        // 未解鎖：預設為非顯示卡片模式 (Zen 桌面遙控器模式)
+        document.body.classList.add('zen-mode');
+        if (btn) btn.innerText = '📖 顯示課文卡片';
+      } else {
+        // 已解鎖：預設為顯示卡片模式
+        document.body.classList.remove('zen-mode');
+        if (btn) btn.innerText = '🗂️ 桌面遙控器';
+      }
+    }
+
     function toggleZenMode() {
       document.body.classList.toggle('zen-mode');
       const btn = document.getElementById('btnZenToggle');
       const isZen = document.body.classList.contains('zen-mode');
       btn.innerText = isZen ? '📖 顯示課文卡片' : '🗂️ 桌面遙控器';
+    }
+
+    /**
+     * ========================================================================
+     * 朗讀動態變色條 (使用 requestAnimationFrame 100% 硬體時鐘實時同步)
+     * ========================================================================
+     */
+    function startReadingProgress() {
+      cancelAnimationFrame(progressRafId);
+      const fillEl = document.getElementById('glanceProgressFill');
+      const player = document.getElementById('mainAudio');
+      if (!fillEl || !player) return;
+
+      fillEl.style.display = 'block';
+
+      function step() {
+        if (!player.paused && !player.ended) {
+          if (player.duration && isFinite(player.duration) && player.duration > 0) {
+            const pct = Math.min(100, Math.max(0, (player.currentTime / player.duration) * 100));
+            fillEl.style.width = pct + '%';
+          }
+          progressRafId = requestAnimationFrame(step);
+        }
+      }
+      progressRafId = requestAnimationFrame(step);
+    }
+
+    function resetReadingProgress() {
+      cancelAnimationFrame(progressRafId);
+      const fillEl = document.getElementById('glanceProgressFill');
+      if (fillEl) {
+        fillEl.style.display = 'none';
+        fillEl.style.width = '0%';
+      }
     }
 
     /**
@@ -529,17 +584,13 @@
       const iconEl = document.getElementById('glanceCenterIcon');
       const countEl = document.getElementById('glanceCountdownNumber');
       const subEl = document.getElementById('glanceStatusSub');
-      const fillEl = document.getElementById('glanceProgressFill');
       if (!banner) return;
 
       banner.className = `glance-banner status-${state}`;
       titleEl.innerText = title;
 
-      // 若非朗讀狀態，隱藏並重設動態變色層
-      if (state !== 'reading' && fillEl) {
-        fillEl.style.animation = 'none';
-        fillEl.style.display = 'none';
-        fillEl.style.width = '0%';
+      if (state !== 'reading') {
+        resetReadingProgress();
       }
 
       if (countdownSec !== null && countdownSec !== undefined) {
@@ -620,10 +671,9 @@
         mainBtn.className = "btn-pyramid-main state-pause";
         mainBtn.innerText = "⏸ 暫停讀默";
 
-        const fillEl = document.getElementById('glanceProgressFill');
-        if (fillEl && fillEl.style.animationPlayState === 'paused') {
-          fillEl.style.animationPlayState = 'running';
-        }
+        const player = document.getElementById('mainAudio');
+        player.play().catch(() => {});
+        startReadingProgress();
 
         runDictationCycle();
       } else {
@@ -678,22 +728,15 @@
 
       const player = document.getElementById('mainAudio');
       player.src = audioBlobUrls[idx];
-      player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
 
-      // 當音訊真正開始播放時，啟動 CSS 動態變色推進動畫
+      // onplay 時強制設置 playbackRate，避免行動端重置為 1.0，並啟動實時進度條
       player.onplay = () => {
-        const fillEl = document.getElementById('glanceProgressFill');
-        if (fillEl) {
-          const duration = (player.duration && isFinite(player.duration)) ? player.duration : 3;
-          const rate = player.playbackRate || 0.8;
-          const realSeconds = Math.max(0.2, duration / rate);
-          fillEl.style.display = 'block';
-          fillEl.style.animation = `readingProgressFill ${realSeconds}s linear forwards`;
-          fillEl.style.animationPlayState = 'running';
-        }
+        player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
+        startReadingProgress();
       };
 
       player.onended = () => {
+        resetReadingProgress();
         if (!dictation.isRunning || dictation.isPaused) return;
 
         const mult = Number(serverState.settings.pauseMultiplier || 1.0);
@@ -738,12 +781,10 @@
       dictation.isPaused = true;
       clearInterval(dictation.timer);
       releaseWakeLock();
-      document.getElementById('mainAudio').pause();
 
-      const fillEl = document.getElementById('glanceProgressFill');
-      if (fillEl) {
-        fillEl.style.animationPlayState = 'paused';
-      }
+      const player = document.getElementById('mainAudio');
+      player.pause();
+      cancelAnimationFrame(progressRafId);
 
       const mainBtn = document.getElementById('btnMainAction');
       mainBtn.className = "btn-pyramid-main state-resume";
@@ -762,13 +803,7 @@
       player.pause();
       player.onplay = null;
       player.onended = null;
-
-      const fillEl = document.getElementById('glanceProgressFill');
-      if (fillEl) {
-        fillEl.style.animation = 'none';
-        fillEl.style.display = 'none';
-        fillEl.style.width = '0%';
-      }
+      resetReadingProgress();
 
       if (resetIdx) {
         selectedActiveIdx = 0;
@@ -811,6 +846,7 @@
       player.pause();
       player.onplay = null;
       player.onended = null;
+      resetReadingProgress();
 
       selectedActiveIdx = targetIdx;
       dictation.chunkIdx = targetIdx;
@@ -839,23 +875,17 @@
       const player = document.getElementById('mainAudio');
       if (audioBlobUrls[idx]) {
         player.src = audioBlobUrls[idx];
-        player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
 
         player.onplay = () => {
-          const fillEl = document.getElementById('glanceProgressFill');
-          if (fillEl) {
-            const duration = (player.duration && isFinite(player.duration)) ? player.duration : 3;
-            const rate = player.playbackRate || 0.8;
-            const realSeconds = Math.max(0.2, duration / rate);
-            fillEl.style.display = 'block';
-            fillEl.style.animation = `readingProgressFill ${realSeconds}s linear forwards`;
-            fillEl.style.animationPlayState = 'running';
-          }
+          player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
+          startReadingProgress();
         };
 
         player.onended = () => {
+          resetReadingProgress();
           updateGlanceBanner('idle', '試聽完畢', null, '點擊開始讀默');
         };
+
         player.play().catch(() => {});
       }
     }
@@ -874,7 +904,7 @@
 
     /**
      * ========================================================================
-     * 課文載入與音檔載入 (嚴格遵從 config.js，零寫死)
+     * 課文載入與音檔載入 (嚴格遵從 config.js)
      * ========================================================================
      */
     function getRawUrl(path) {
@@ -923,6 +953,9 @@
 
       const mainBtn = document.getElementById('btnMainAction');
       mainBtn.disabled = true;
+
+      // 載入課文時，根據解鎖狀態自動套用預設模式 (未解鎖->非顯示卡片模式 / 已解鎖->顯示)
+      syncCardVisibilityWithLock();
 
       isTextMasked = true;
       updateEyeBtnUI();
@@ -1537,6 +1570,7 @@
       if (savedToken && serverState.unlockToken && savedToken !== serverState.unlockToken) {
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
       }
+      syncCardVisibilityWithLock();
       updateLockCardUI();
       updateEyeBtnUI();
     }
@@ -1573,7 +1607,6 @@
         eyeBtn.style.display = 'inline-flex';
         eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
       }
-      // 方案2：更新頂部鎖定橫額標籤文字
       updateRunningLockTitle();
       renderChunks();
     }
@@ -1590,6 +1623,7 @@
 
       if (unlocked) {
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
+        syncCardVisibilityWithLock();
         updateLockCardUI();
         updateEyeBtnUI();
       } else {
@@ -1602,6 +1636,7 @@
           if (res.valid && res.unlockToken) {
             serverState.unlockToken = res.unlockToken;
             localStorage.setItem(UNLOCK_STORAGE_KEY, res.unlockToken);
+            syncCardVisibilityWithLock();
             updateLockCardUI();
             updateEyeBtnUI();
           } else if (res.lockedOut) {
@@ -1625,6 +1660,7 @@
         const res = await callGAS('revokeAllDevices');
         serverState.unlockToken = res.unlockToken;
         localStorage.removeItem(UNLOCK_STORAGE_KEY);
+        syncCardVisibilityWithLock();
         updateLockCardUI();
         updateEyeBtnUI();
         alert("🔒 已鎖定所有裝置");
