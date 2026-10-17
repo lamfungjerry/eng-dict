@@ -520,7 +520,7 @@
       <span id="keyMissingDot" class="dot-badge" style="display:none;"></span>
     </button>
 
-    <h1 class="app-title" onclick="history.back()" style="cursor: pointer;">📖長文讀默</h1>
+    <h1 class="app-title" onclick="safeBack()" style="cursor: pointer;">📖長文讀默</h1>
 
     <button class="icon-btn" onclick="openSettingsModal()" aria-label="系統設定">
       ⚙️
@@ -2135,6 +2135,12 @@
       return String(str).replace(/[&<>"']/g, s => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[s]));
+    }
+    function safeBack() {
+      // 檢查上一頁是否屬於同一個網站
+      if (document.referrer && document.referrer.startsWith(window.location.origin)) {
+        history.back();
+      }
     }
   </script>
 </body>
