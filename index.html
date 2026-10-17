@@ -4,9 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>英文智能讀默</title>
-  <script src="config.js"></script>
-  <!-- 引入外部獨立樣式檔 style.css -->
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
 </head>
 <body>
 
@@ -16,7 +15,7 @@
       <span id="keyMissingDot" class="dot-badge" style="display:none;"></span>
     </button>
 
-    <h1 class="app-title" onclick="safeBack()" style="cursor: pointer;">📖長文讀默</h1>
+    <h1 class="app-title" onclick="safeBack()" style="cursor: pointer;">📖 英文讀默</h1>
 
     <button class="icon-btn" onclick="openSettingsModal()" aria-label="系統設定">
       ⚙️
@@ -90,11 +89,11 @@
           </div>
         </div>
 
-        <!-- 第一行控制鍵：自動播放 ｜ 暫停 ｜ 由頭播放 -->
+        <!-- 第一行控制鍵：連續播放 ｜ 暫停 ｜ 從頭播放 -->
         <div class="controls-grid">
-          <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 自動播放</button>
+          <button id="btnPlay" class="btn btn-success" onclick="handleStartOrResumeDictation()" disabled>▶ 連續播放</button>
           <button id="btnPause" class="btn btn-warning" onclick="pauseDictation()" disabled>⏸ 暫停</button>
-          <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 由頭播放</button>
+          <button id="btnRestart" class="btn btn-outline" onclick="restartFromBeginning()" disabled>⏮ 從頭播放</button>
         </div>
 
         <!-- 第二行控制鍵：上一句 ｜ 重播 ｜ 下一句 -->
@@ -104,9 +103,14 @@
           <button id="btnNext" class="btn btn-outline" onclick="handleNextChunk()" disabled>⏭ 下一句</button>
         </div>
 
-        <!-- 播放器欄位 (還原原生播放器，右手邊放顯示/隱藏眼睛按鈕) -->
+        <!-- 音訊條 + 卡片切換按鈕（無權限限制） + 文字隱藏切換按鈕（已解鎖才顯示） -->
         <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
           <audio id="mainAudio" playsinline controls style="flex:1; height:36px; outline:none; min-width:0;"></audio>
+          
+          <button type="button" id="btnCardsToggle" class="icon-btn" style="width:36px; height:36px; font-size:1.15rem;" onclick="toggleCardsDisplay()" title="顯示/隱藏課文卡片">
+            🗂️
+          </button>
+
           <button type="button" id="btnEyeToggle" class="icon-btn" style="width:36px; height:36px; font-size:1.15rem; display:none;" onclick="toggleMaskWithEye()" title="顯示/隱藏文字">
             👁️
           </button>
@@ -274,6 +278,7 @@
     let audioBlobUrls = {};
 
     let isTextMasked = true;
+    let isCardsVisible = true; // 卡片顯示/隱藏狀態
     let selectedActiveIdx = -1;
     let isVoiceDownloading = false;
 
@@ -302,6 +307,12 @@
       } catch (e) {}
     }
 
+    function safeBack() {
+      if (document.referrer && document.referrer.startsWith(window.location.origin)) {
+        history.back();
+      }
+    }
+
     function sanitizeFileName(str) {
       return String(str || '').replace(/[^a-zA-Z0-9\u4e00-\u9fa5_\-]/g, "_").substring(0, 45);
     }
@@ -317,46 +328,36 @@
 
     /**
      * ========================================================================
-     * 初始化
+     * 初始化 (DOMContentLoaded + 背景並行載入)
      * ========================================================================
      */
-    // 改為 DOMContentLoaded 並把遠端呼叫放 background 並行處理
     window.addEventListener('DOMContentLoaded', function() {
-      // 快速初始化本地 UI（同步、不等待遠端）
       document.querySelectorAll('.modal-backdrop').forEach(bd => {
         bd.addEventListener('touchmove', (e) => {
           if (e.target === bd) e.preventDefault();
         }, { passive: false });
       });
-    
+
       populateConfigDropdowns();
       updateLockCardUI();
       updateEyeBtnUI();
-      updateEyeBtnUI();
       applyBrowserPlaybackRate();
-    
-      // 隱藏全頁 loading（或改為 skeleton），讓使用者立即看到 UI
+
       const globalLoadingCard = document.getElementById('globalLoadingCard');
       if (globalLoadingCard) globalLoadingCard.style.display = 'none';
-    
-      // 背景並行載入遠端資料（不阻塞 UI）
+
       (async () => {
         try {
           const [initRes, catalogRes] = await Promise.allSettled([
             syncInitStateFromGAS(),
             loadCatalogFromGitHub()
           ]);
-    
-          // 如果 init 成功，應用必要狀態更新（reconcile、alert dot、playback）
+
           if (initRes.status === 'fulfilled' && initRes.value) {
-            // 如果 syncInitStateFromGAS 會設 serverState，這裡可以 call the usual post-sync handlers
             reconcileUnlockTokenWithServer();
             refreshKeyAlertDot();
             applyBrowserPlaybackRate();
           }
-    
-          // 如果 loadCatalog 成功，render 課文目錄（loadCatalogFromGitHub 內應該已做）
-          // 若需要特別處理錯誤，可在此加入 fallback 顯示
         } catch (e) {
           console.error('背景初始化錯誤：', e);
         }
@@ -393,8 +394,10 @@
         reconcileUnlockTokenWithServer();
         refreshKeyAlertDot();
         applyBrowserPlaybackRate();
+        return serverState;
       } catch (e) {
         console.error("GAS 連線失敗:", e);
+        return null;
       }
     }
 
@@ -453,7 +456,24 @@
 
     /**
      * ========================================================================
-     * 課文專屬語音選擇 Modal
+     * 卡片顯示/隱藏切換 (無任何權限限制)
+     * ========================================================================
+     */
+    function toggleCardsDisplay() {
+      isCardsVisible = !isCardsVisible;
+      const container = document.getElementById('chunkListContainer');
+      const btn = document.getElementById('btnCardsToggle');
+      if (container) {
+        container.style.display = isCardsVisible ? 'flex' : 'none';
+      }
+      if (btn) {
+        btn.style.opacity = isCardsVisible ? '1' : '0.4';
+      }
+    }
+
+    /**
+     * ========================================================================
+     * 課文專屬語音選擇 Modal (按 config.js 順序排，全下載完成隱藏按鈕)
      * ========================================================================
      */
     function openVoicePickerModal() {
@@ -1022,6 +1042,8 @@
       const cont = document.getElementById('chunkListContainer');
       if (!currentLesson) { cont.innerHTML = ''; return; }
 
+      cont.style.display = isCardsVisible ? 'flex' : 'none';
+
       const mult = Number(serverState.settings.pauseMultiplier || 1.0);
 
       cont.innerHTML = currentLesson.chunks.map((c, idx) => {
@@ -1043,22 +1065,10 @@
       }).join('');
     }
 
-    // 點擊卡片：單句試聽、變 active，播完即止（不自動跳下一句）
+    // 點擊卡片：同上一句/下一句一樣，如果正處於連續播放模式，直接換句並繼續跑連續讀默
     function onChunkCardClicked(idx) {
       if (!currentLesson) return;
-      ensureIosAudioKeepAlive();
-
-      stopDictation();
-
-      selectedActiveIdx = idx;
-      dictation.chunkIdx = idx;
-      dictation.pass = 1;
-
-      renderChunks();
-      scrollChunkIntoView(idx);
-      updateNavButtonsState();
-
-      playSingleChunkAudio(idx);
+      navigateChunk(idx);
     }
 
     function playSingleChunkAudio(idx) {
@@ -1079,13 +1089,11 @@
       }
     }
 
-    // 上一句：不中斷自動播放
     function handlePrevChunk() {
       if (!currentLesson || selectedActiveIdx <= 0) return;
       navigateChunk(selectedActiveIdx - 1);
     }
 
-    // 下一句：不中斷自動播放
     function handleNextChunk() {
       if (!currentLesson) return;
       const total = currentLesson.chunks.length;
@@ -1111,11 +1119,13 @@
       updateNavButtonsState();
 
       if (dictation.isRunning) {
+        // 連續播放模式中：即時切換目標句子，並維持連續讀默規則運行
         dictation.isPaused = false;
         document.getElementById('btnPlay').disabled = true;
         document.getElementById('btnPause').disabled = false;
         runDictationCycle();
       } else {
+        // 非連續播放模式：單句預覽，播完即止
         playSingleChunkAudio(targetIdx);
       }
     }
@@ -1182,7 +1192,7 @@
         scrollChunkIntoView(0);
         updateNavButtonsState();
 
-        document.getElementById('btnPlay').innerText = "▶ 自動播放";
+        document.getElementById('btnPlay').innerText = "▶ 連續播放";
         document.getElementById('btnPlay').disabled = false;
         document.getElementById('btnPause').disabled = true;
         document.getElementById('playerBanner').innerText = "🎉 讀默完成";
@@ -1262,7 +1272,7 @@
       player.onended = null;
 
       const btn = document.getElementById('btnPlay');
-      btn.innerText = "▶ 自動播放";
+      btn.innerText = "▶ 連續播放";
       btn.disabled = !currentLesson;
       document.getElementById('btnPause').disabled = true;
     }
@@ -1293,10 +1303,9 @@
       navigateChunk(target);
     }
 
-    // 精準捲動防遮擋：動態獲取吸頂面板高度，並確保目標句子 100% 完整呈現在畫面上
     function scrollChunkIntoView(idx) {
       const el = document.getElementById(`chunk_row_${idx}`);
-      if (!el) return;
+      if (!el || !isCardsVisible) return;
 
       const topNav = document.querySelector('.top-nav');
       const stickyControls = document.querySelector('.sticky-player-controls');
@@ -1468,7 +1477,7 @@
 
     /**
      * ========================================================================
-     * Key Modal 控制
+     * Key Modal 控制 (已設定 badge 與 input box 互斥顯示)
      * ========================================================================
      */
     function openKeyModal() {
@@ -1659,12 +1668,6 @@
       return String(str).replace(/[&<>"']/g, s => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[s]));
-    }
-    function safeBack() {
-      // 檢查上一頁是否屬於同一個網站
-      if (document.referrer && document.referrer.startsWith(window.location.origin)) {
-        history.back();
-      }
     }
   </script>
 </body>
