@@ -824,20 +824,48 @@
      * 初始化
      * ========================================================================
      */
-    window.onload = async function() {
+    // 改為 DOMContentLoaded 並把遠端呼叫放 background 並行處理
+    window.addEventListener('DOMContentLoaded', function() {
+      // 快速初始化本地 UI（同步、不等待遠端）
       document.querySelectorAll('.modal-backdrop').forEach(bd => {
         bd.addEventListener('touchmove', (e) => {
           if (e.target === bd) e.preventDefault();
         }, { passive: false });
       });
-
+    
       populateConfigDropdowns();
       updateLockCardUI();
       updateEyeBtnUI();
-
-      await syncInitStateFromGAS();
-      await loadCatalogFromGitHub();
-    };
+      updateEyeBtnUI();
+      applyBrowserPlaybackRate();
+    
+      // 隱藏全頁 loading（或改為 skeleton），讓使用者立即看到 UI
+      const globalLoadingCard = document.getElementById('globalLoadingCard');
+      if (globalLoadingCard) globalLoadingCard.style.display = 'none';
+    
+      // 背景並行載入遠端資料（不阻塞 UI）
+      (async () => {
+        try {
+          const [initRes, catalogRes] = await Promise.allSettled([
+            syncInitStateFromGAS(),
+            loadCatalogFromGitHub()
+          ]);
+    
+          // 如果 init 成功，應用必要狀態更新（reconcile、alert dot、playback）
+          if (initRes.status === 'fulfilled' && initRes.value) {
+            // 如果 syncInitStateFromGAS 會設 serverState，這裡可以 call the usual post-sync handlers
+            reconcileUnlockTokenWithServer();
+            refreshKeyAlertDot();
+            applyBrowserPlaybackRate();
+          }
+    
+          // 如果 loadCatalog 成功，render 課文目錄（loadCatalogFromGitHub 內應該已做）
+          // 若需要特別處理錯誤，可在此加入 fallback 顯示
+        } catch (e) {
+          console.error('背景初始化錯誤：', e);
+        }
+      })();
+    });
 
     function populateConfigDropdowns() {
       const modelSel = document.getElementById('addGeminiModelSelect');
