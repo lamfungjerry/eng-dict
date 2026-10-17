@@ -651,9 +651,13 @@
     }
 
     function copySystemPrompt() {
-      const promptText = serverState.systemPrompt || "請將課文以小學生英文讀默為目標分拆為意群純 JSON 格式。";
-      navigator.clipboard.writeText(promptText).then(() => {
-        const btn = document.getElementById('btnCopyPrompt');
+      const btn = document.getElementById('btnCopyPrompt');
+      if (!serverState.systemPrompt) {
+        btn.innerText = "⏳ 載入中...";
+        setTimeout(() => { btn.innerText = "📋 複製 Prompt"; }, 1500);
+        return;
+      }
+      navigator.clipboard.writeText(serverState.systemPrompt).then(() => {
         btn.innerText = "✅ 已複製";
         setTimeout(() => { btn.innerText = "📋 複製 Prompt"; }, 2000);
       }).catch(() => {
