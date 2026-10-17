@@ -73,68 +73,76 @@
     <!-- 視圖 B：學生讀默播放介面 -->
     <section id="viewPlayer" class="card" style="display:none;">
 
-      <!-- 階段一：準備階段全寬大選課條 -->
-      <div id="lessonPickerWrapper" class="lesson-picker-card">
-        <div class="lesson-select-wrapper">
-          <select id="lessonDropdown" class="lesson-select-large" onchange="onSelectLessonFromDropdown(this.value)">
-          </select>
-          <span class="lesson-select-arrow">▼</span>
+      <!-- 吸頂固定控制面板 (滾動時永遠置頂可見) -->
+      <div class="player-controls-sticky-panel">
+
+        <!-- 階段一：準備階段全寬大選課條 -->
+        <div id="lessonPickerWrapper" class="lesson-picker-card">
+          <div class="lesson-select-wrapper">
+            <select id="lessonDropdown" class="lesson-select-large" onchange="onSelectLessonFromDropdown(this.value)">
+            </select>
+            <span class="lesson-select-arrow">▼</span>
+          </div>
         </div>
-      </div>
 
-      <!-- 階段二：默書進行階段鎖定標籤 (防誤觸跳課) -->
-      <div id="lessonRunningLock" class="lesson-locked-banner" style="display:none; margin-bottom:12px;">
-        <span id="lessonRunningTitleText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">📌 當前課文</span>
-        <button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; background:white;" onclick="stopDictation(true)">
-          ⏹ 結束換課
-        </button>
-      </div>
-
-      <!-- 餘光感知大看板 (Chroma-Cueing) -->
-      <div id="glanceBanner" class="glance-banner status-idle">
-        <div id="glanceStatusTitle" class="glance-status-title">準備就緒</div>
-        <div id="glanceCountdownNumber" class="glance-countdown-number" style="display:none;">0</div>
-        <div id="glanceStatusSub" class="glance-status-sub">點擊下方開始按鈕開始默書</div>
-      </div>
-
-      <!-- 三級金字塔控制器 -->
-      <div class="controls-pyramid">
-        <!-- 第 1 級：播放 / 暫停合一大鍵 -->
-        <button type="button" id="btnMainAction" class="btn-pyramid-main state-start" onclick="handleMainActionClick()" disabled>
-          ▶ 開始讀默
-        </button>
-
-        <!-- 第 2 級：再聽一次 (重播) -->
-        <button type="button" id="btnReplayAction" class="btn-pyramid-replay" onclick="replayCurrentChunk()" disabled>
-          ↺ 再聽一次
-        </button>
-
-        <!-- 第 3 級：上一句 / 下一句 -->
-        <div class="controls-nav-row">
-          <button type="button" id="btnPrevAction" class="btn-nav-step" onclick="handlePrevChunk()" disabled>
-            ⏮ 上一句
-          </button>
-          <button type="button" id="btnNextAction" class="btn-nav-step" onclick="handleNextChunk()" disabled>
-            ⏭ 下一句
+        <!-- 階段二：默書進行階段鎖定標籤 (防誤觸跳課) -->
+        <div id="lessonRunningLock" class="lesson-locked-banner" style="display:none; margin-bottom:12px;">
+          <span id="lessonRunningTitleText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">📌 當前課文</span>
+          <button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; background:white;" onclick="stopDictation(true)">
+            ⏹ 結束換課
           </button>
         </div>
-      </div>
 
-      <!-- 次要輔助列 (遙控器切換 / 語音標籤 / 遮蔽切換) -->
-      <div class="sub-toolbar">
-        <button type="button" id="btnZenToggle" class="zen-toggle-btn" onclick="toggleZenMode()">
-          🗂️ 桌面遙控器
-        </button>
-
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 語音</span>
-          <button type="button" id="btnEyeToggle" class="icon-btn" style="width:34px; height:34px; font-size:1.05rem; display:none;" onclick="toggleMaskWithEye()" title="顯示/隱藏文字">
-            👁️
-          </button>
+        <!-- 餘光感知大看板 (高度已嚴格鎖定，零抖動) -->
+        <div id="glanceBanner" class="glance-banner status-idle">
+          <div id="glanceStatusTitle" class="glance-status-title">準備就緒</div>
+          <div class="glance-center-slot">
+            <span id="glanceCenterIcon" class="glance-center-icon">🎧</span>
+            <span id="glanceCountdownNumber" class="glance-countdown-number" style="display:none;">0</span>
+          </div>
+          <div id="glanceStatusSub" class="glance-status-sub">點擊下方開始按鈕開始默書</div>
         </div>
-      </div>
 
-      <!-- 課文卡片清單 (Zen 模式下自動隱藏) -->
+        <!-- 三級金字塔控制器 -->
+        <div class="controls-pyramid">
+          <!-- 第 1 級：播放 / 暫停合一大鍵 -->
+          <button type="button" id="btnMainAction" class="btn-pyramid-main state-start" onclick="handleMainActionClick()" disabled>
+            ▶ 開始讀默
+          </button>
+
+          <!-- 第 2 級：再聽一次 (重播) -->
+          <button type="button" id="btnReplayAction" class="btn-pyramid-replay" onclick="replayCurrentChunk()" disabled>
+            ↺ 再聽一次
+          </button>
+
+          <!-- 第 3 級：上一句 / 下一句 -->
+          <div class="controls-nav-row">
+            <button type="button" id="btnPrevAction" class="btn-nav-step" onclick="handlePrevChunk()" disabled>
+              ⏮ 上一句
+            </button>
+            <button type="button" id="btnNextAction" class="btn-nav-step" onclick="handleNextChunk()" disabled>
+              ⏭ 下一句
+            </button>
+          </div>
+        </div>
+
+        <!-- 次要輔助列 (遙控器切換 / 語音標籤 / 遮蔽切換) -->
+        <div class="sub-toolbar">
+          <button type="button" id="btnZenToggle" class="zen-toggle-btn" onclick="toggleZenMode()">
+            🗂️ 桌面遙控器
+          </button>
+
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span id="currentVoiceBadge" class="voice-switch-badge" style="display:none;" onclick="openVoicePickerModal()">🎙️ 語音</span>
+            <button type="button" id="btnEyeToggle" class="icon-btn" style="width:34px; height:34px; font-size:1.05rem; display:none;" onclick="toggleMaskWithEye()" title="顯示/隱藏文字">
+              👁️
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /.player-controls-sticky-panel -->
+
+      <!-- 課文卡片清單 (Zen 模式下自動隱藏，滾動時置於控制器下方) -->
       <div id="chunkListContainer" class="chunk-grid"></div>
 
     </section>
@@ -262,8 +270,8 @@
           <div id="cardTextLock" class="stepper-mini-card">
             <div id="cardTextLockTitle" class="stepper-mini-title" style="color:var(--danger);">顯示文字</div>
             <div class="stepper-control">
-              <button type="button" id="btnToggleLock" class="btn btn-outline" style="padding:4px 12px; font-size:0.85rem;" onclick="handleLockToggle()">
-                解鎖
+              <button type="button" id="btnToggleLock" class="btn-lock-status locked" onclick="handleLockToggle()">
+                🔒 解鎖
               </button>
             </div>
           </div>
@@ -506,12 +514,13 @@
 
     /**
      * ========================================================================
-     * 餘光感知大看板 (Chroma-Cueing) 狀態更新
+     * 餘光感知大看板 (Chroma-Cueing) 狀態更新 (固定槽切換，零版面抖動)
      * ========================================================================
      */
     function updateGlanceBanner(state, title, countdownSec, subText) {
       const banner = document.getElementById('glanceBanner');
       const titleEl = document.getElementById('glanceStatusTitle');
+      const iconEl = document.getElementById('glanceCenterIcon');
       const countEl = document.getElementById('glanceCountdownNumber');
       const subEl = document.getElementById('glanceStatusSub');
       if (!banner) return;
@@ -520,10 +529,20 @@
       titleEl.innerText = title;
 
       if (countdownSec !== null && countdownSec !== undefined) {
-        countEl.style.display = 'block';
-        countEl.innerText = countdownSec;
+        if (iconEl) iconEl.style.display = 'none';
+        if (countEl) {
+          countEl.style.display = 'block';
+          countEl.innerText = countdownSec;
+        }
       } else {
-        countEl.style.display = 'none';
+        if (countEl) countEl.style.display = 'none';
+        if (iconEl) {
+          iconEl.style.display = 'inline-block';
+          if (state === 'reading') iconEl.innerText = '🔊';
+          else if (state === 'paused') iconEl.innerText = '⏸';
+          else if (state === 'idle') iconEl.innerText = '🎧';
+          else iconEl.innerText = '✨';
+        }
       }
 
       subEl.innerText = subText || '';
@@ -541,7 +560,6 @@
       const mainBtn = document.getElementById('btnMainAction');
 
       if (isRunning) {
-        // 進行階段：隱藏大選單，展開防誤觸鎖定標籤
         pickerWrapper.style.display = 'none';
         lockBanner.style.display = 'flex';
         runningTitle.innerText = `📌 ${currentLesson ? currentLesson.title : '課文'}`;
@@ -549,7 +567,6 @@
         mainBtn.className = "btn-pyramid-main state-pause";
         mainBtn.innerText = "⏸ 暫停讀默";
       } else {
-        // 準備階段：展示大選單，收起鎖定標籤
         pickerWrapper.style.display = 'block';
         lockBanner.style.display = 'none';
 
@@ -567,10 +584,8 @@
       if (!currentLesson) return;
 
       if (!dictation.isRunning) {
-        // 開始全新讀默
         handleStartOrResumeDictation();
       } else if (dictation.isPaused) {
-        // 繼續讀默
         dictation.isPaused = false;
         ensureIosAudioKeepAlive();
         requestWakeLock();
@@ -581,7 +596,6 @@
 
         runDictationCycle();
       } else {
-        // 暫停讀默
         pauseDictation();
       }
     }
@@ -617,7 +631,7 @@
 
       if (idx >= total) {
         stopDictation(false);
-        updateGlanceBanner('idle', '🎉 讀默完成！', null, '棒極了，已完成整篇課文！');
+        updateGlanceBanner('idle', '🎉 讀默完成！', null, '已完成整篇課文！');
         return;
       }
 
@@ -629,7 +643,6 @@
       const chunk = currentLesson.chunks[idx];
       const label = chunk.isTitle ? "課題" : `第 ${chunk.index}/${total - 1} 句`;
 
-      // 朗讀中：切換為深冷藍色看板
       updateGlanceBanner('reading', `🔊 朗讀中：${label}`, null, `第 ${dictation.pass}/${maxPasses} 次朗讀`);
 
       const player = document.getElementById('mainAudio');
@@ -643,7 +656,6 @@
         let remain = Math.max(1, Math.round(chunk.pauseSeconds * mult));
         const waitLabel = chunk.isTitle ? "默寫課題" : "默寫停頓中";
 
-        // 默寫停頓中：切換為暖橙色看板與巨型倒數
         updateGlanceBanner('writing', `✍️ ${waitLabel}`, remain, `共讀 ${maxPasses} 次，當前第 ${dictation.pass} 次`);
 
         clearInterval(dictation.timer);
@@ -850,7 +862,6 @@
         currentLesson = await res.json();
         currentLesson.folderName = folderName;
 
-        // 動態匹配 config.js 中已下載的語音模型
         const configuredVoices = APP_CONFIG.TTS_VOICES || [];
         const downloadedVoices = configuredVoices.filter(v => 
           currentLesson.voices && currentLesson.voices[v.id] && currentLesson.voices[v.id].downloaded
@@ -970,19 +981,22 @@
       if (!el || document.body.classList.contains('zen-mode')) return;
 
       const topNav = document.querySelector('.top-nav');
-      const navH = topNav ? topNav.offsetHeight : 64;
-      const rect = el.getBoundingClientRect();
-      const windowH = window.innerHeight;
+      const stickyPanel = document.querySelector('.player-controls-sticky-panel');
+      const navH = topNav ? topNav.offsetHeight : 54;
+      const panelH = stickyPanel ? stickyPanel.offsetHeight : 270;
+      const totalStickyH = navH + panelH + 10;
 
-      if (rect.top < navH + 120 || rect.bottom > windowH - 20) {
-        const targetScrollTop = window.pageYOffset + rect.top - navH - 120;
+      const rect = el.getBoundingClientRect();
+
+      if (rect.top < totalStickyH || rect.bottom > window.innerHeight - 20) {
+        const targetScrollTop = window.pageYOffset + rect.top - totalStickyH - 8;
         window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
       }
     }
 
     /**
      * ========================================================================
-     * 家長功能：建立課文、相片壓縮、複製 Prompt (方案 A Promise 等待)
+     * 家長功能：建立課文、相片壓縮、複製 Prompt
      * ========================================================================
      */
     function switchView(mode) {
@@ -1462,7 +1476,7 @@
       const btn = document.getElementById('btnToggleLock');
       const btnRevokeAll = document.getElementById('btnRevokeAllLocks');
       if (!btn) return;
-    
+
       if (unlocked) {
         titleEl.style.color = "var(--success)";
         btn.className = "btn-lock-status unlocked";
