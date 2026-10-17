@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>英文智能讀默</title>
   <link rel="stylesheet" href="style.css">
-  <script src="config.js?version=1"></script>
+  <script src="config.js"></script>
 </head>
 <body>
 
@@ -1462,16 +1462,16 @@
       const btn = document.getElementById('btnToggleLock');
       const btnRevokeAll = document.getElementById('btnRevokeAllLocks');
       if (!btn) return;
-
+    
       if (unlocked) {
         titleEl.style.color = "var(--success)";
-        btn.className = "btn btn-outline";
-        btn.innerText = "鎖定";
+        btn.className = "btn-lock-status unlocked";
+        btn.innerHTML = "🔓 鎖定";
         if (btnRevokeAll) btnRevokeAll.style.display = 'block';
       } else {
         titleEl.style.color = "var(--danger)";
-        btn.className = "btn btn-outline";
-        btn.innerText = "解鎖";
+        btn.className = "btn-lock-status locked";
+        btn.innerHTML = "🔒 解鎖";
         if (btnRevokeAll) btnRevokeAll.style.display = 'none';
       }
     }
