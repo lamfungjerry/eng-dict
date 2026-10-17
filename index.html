@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>英文智能讀默</title>
-  <link rel="stylesheet" href="style.css?v=1">
-  <script src="config.js?v=1"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
 </head>
 <body>
 
@@ -85,22 +85,28 @@
           </div>
         </div>
 
-        <!-- 階段二：默書進行階段鎖定標籤 (防誤觸跳課) -->
+        <!-- 階段二：默書進行階段鎖定標籤 (方案2：遮蔽時防偷看題目，解鎖時還原課名) -->
         <div id="lessonRunningLock" class="lesson-locked-banner" style="display:none; margin-bottom:12px;">
-          <span id="lessonRunningTitleText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">📌 當前課文</span>
+          <span id="lessonRunningTitleText" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">✍️ 默書進行中</span>
           <button type="button" class="btn btn-outline" style="padding:4px 10px; font-size:0.8rem; background:white;" onclick="stopDictation(true)">
             ⏹ 結束換課
           </button>
         </div>
 
-        <!-- 餘光感知大看板 (高度已嚴格鎖定，零抖動) -->
+        <!-- 餘光感知大看板 (含朗讀漸進式動態變色層) -->
         <div id="glanceBanner" class="glance-banner status-idle">
-          <div id="glanceStatusTitle" class="glance-status-title">準備就緒</div>
-          <div class="glance-center-slot">
-            <span id="glanceCenterIcon" class="glance-center-icon">🎧</span>
-            <span id="glanceCountdownNumber" class="glance-countdown-number" style="display:none;">0</span>
+          <!-- 朗讀動態推進層 (深冷藍) -->
+          <div id="glanceProgressFill" class="glance-progress-fill"></div>
+
+          <!-- 看板文字與圖示內容 (Z-index 置頂) -->
+          <div class="glance-banner-content">
+            <div id="glanceStatusTitle" class="glance-status-title">準備就緒</div>
+            <div class="glance-center-slot">
+              <span id="glanceCenterIcon" class="glance-center-icon">🎧</span>
+              <span id="glanceCountdownNumber" class="glance-countdown-number" style="display:none;">0</span>
+            </div>
+            <div id="glanceStatusSub" class="glance-status-sub">點擊下方開始按鈕開始默書</div>
           </div>
-          <div id="glanceStatusSub" class="glance-status-sub">點擊下方開始按鈕開始默書</div>
         </div>
 
         <!-- 三級金字塔控制器 -->
@@ -514,7 +520,7 @@
 
     /**
      * ========================================================================
-     * 餘光感知大看板 (Chroma-Cueing) 狀態更新 (固定槽切換，零版面抖動)
+     * 餘光感知大看板 (Chroma-Cueing) 狀態更新
      * ========================================================================
      */
     function updateGlanceBanner(state, title, countdownSec, subText) {
@@ -523,10 +529,18 @@
       const iconEl = document.getElementById('glanceCenterIcon');
       const countEl = document.getElementById('glanceCountdownNumber');
       const subEl = document.getElementById('glanceStatusSub');
+      const fillEl = document.getElementById('glanceProgressFill');
       if (!banner) return;
 
       banner.className = `glance-banner status-${state}`;
       titleEl.innerText = title;
+
+      // 若非朗讀狀態，隱藏並重設動態變色層
+      if (state !== 'reading' && fillEl) {
+        fillEl.style.animation = 'none';
+        fillEl.style.display = 'none';
+        fillEl.style.width = '0%';
+      }
 
       if (countdownSec !== null && countdownSec !== undefined) {
         if (iconEl) iconEl.style.display = 'none';
@@ -550,19 +564,31 @@
 
     /**
      * ========================================================================
-     * 讀默兩階段狀態切換 (準備階段 vs 進行階段防誤觸鎖定)
+     * 方案 2：防偷看鎖定標籤文字聯動更新
      * ========================================================================
      */
+    function updateRunningLockTitle() {
+      const runningTitle = document.getElementById('lessonRunningTitleText');
+      if (!runningTitle) return;
+
+      if (isTextMasked) {
+        // 默寫階段（黑膠帶遮蔽）：只顯示專注提示，杜絕第 0 句被偷看
+        runningTitle.innerText = "✍️ 默書進行中";
+      } else {
+        // 家長解鎖顯示文字：還原課文英文標題
+        runningTitle.innerText = `📌 ${currentLesson ? currentLesson.title : '課文'}`;
+      }
+    }
+
     function setDictationWorkflowPhase(isRunning) {
       const pickerWrapper = document.getElementById('lessonPickerWrapper');
       const lockBanner = document.getElementById('lessonRunningLock');
-      const runningTitle = document.getElementById('lessonRunningTitleText');
       const mainBtn = document.getElementById('btnMainAction');
 
       if (isRunning) {
         pickerWrapper.style.display = 'none';
         lockBanner.style.display = 'flex';
-        runningTitle.innerText = `📌 ${currentLesson ? currentLesson.title : '課文'}`;
+        updateRunningLockTitle();
 
         mainBtn.className = "btn-pyramid-main state-pause";
         mainBtn.innerText = "⏸ 暫停讀默";
@@ -593,6 +619,11 @@
         const mainBtn = document.getElementById('btnMainAction');
         mainBtn.className = "btn-pyramid-main state-pause";
         mainBtn.innerText = "⏸ 暫停讀默";
+
+        const fillEl = document.getElementById('glanceProgressFill');
+        if (fillEl && fillEl.style.animationPlayState === 'paused') {
+          fillEl.style.animationPlayState = 'running';
+        }
 
         runDictationCycle();
       } else {
@@ -649,6 +680,19 @@
       player.src = audioBlobUrls[idx];
       player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
 
+      // 當音訊真正開始播放時，啟動 CSS 動態變色推進動畫
+      player.onplay = () => {
+        const fillEl = document.getElementById('glanceProgressFill');
+        if (fillEl) {
+          const duration = (player.duration && isFinite(player.duration)) ? player.duration : 3;
+          const rate = player.playbackRate || 0.8;
+          const realSeconds = Math.max(0.2, duration / rate);
+          fillEl.style.display = 'block';
+          fillEl.style.animation = `readingProgressFill ${realSeconds}s linear forwards`;
+          fillEl.style.animationPlayState = 'running';
+        }
+      };
+
       player.onended = () => {
         if (!dictation.isRunning || dictation.isPaused) return;
 
@@ -696,6 +740,11 @@
       releaseWakeLock();
       document.getElementById('mainAudio').pause();
 
+      const fillEl = document.getElementById('glanceProgressFill');
+      if (fillEl) {
+        fillEl.style.animationPlayState = 'paused';
+      }
+
       const mainBtn = document.getElementById('btnMainAction');
       mainBtn.className = "btn-pyramid-main state-resume";
       mainBtn.innerText = "▶ 繼續讀默";
@@ -711,7 +760,15 @@
 
       const player = document.getElementById('mainAudio');
       player.pause();
+      player.onplay = null;
       player.onended = null;
+
+      const fillEl = document.getElementById('glanceProgressFill');
+      if (fillEl) {
+        fillEl.style.animation = 'none';
+        fillEl.style.display = 'none';
+        fillEl.style.width = '0%';
+      }
 
       if (resetIdx) {
         selectedActiveIdx = 0;
@@ -752,6 +809,7 @@
 
       const player = document.getElementById('mainAudio');
       player.pause();
+      player.onplay = null;
       player.onended = null;
 
       selectedActiveIdx = targetIdx;
@@ -782,6 +840,19 @@
       if (audioBlobUrls[idx]) {
         player.src = audioBlobUrls[idx];
         player.playbackRate = Number(serverState.settings.playbackRate || 0.8);
+
+        player.onplay = () => {
+          const fillEl = document.getElementById('glanceProgressFill');
+          if (fillEl) {
+            const duration = (player.duration && isFinite(player.duration)) ? player.duration : 3;
+            const rate = player.playbackRate || 0.8;
+            const realSeconds = Math.max(0.2, duration / rate);
+            fillEl.style.display = 'block';
+            fillEl.style.animation = `readingProgressFill ${realSeconds}s linear forwards`;
+            fillEl.style.animationPlayState = 'running';
+          }
+        };
+
         player.onended = () => {
           updateGlanceBanner('idle', '試聽完畢', null, '點擊開始讀默');
         };
@@ -1502,6 +1573,8 @@
         eyeBtn.style.display = 'inline-flex';
         eyeBtn.innerText = isTextMasked ? "🙈" : "👁️";
       }
+      // 方案2：更新頂部鎖定橫額標籤文字
+      updateRunningLockTitle();
       renderChunks();
     }
 
