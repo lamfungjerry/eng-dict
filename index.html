@@ -1015,35 +1015,47 @@
     async function selectLesson(folderName) {
       stopDictation();
       selectedActiveIdx = -1;
-
+    
       const banner = document.getElementById('playerBanner');
-      banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔...`;
+      banner.innerHTML = `<span class="loading-hourglass">⏳</span> 讀取課文中...`;
       document.getElementById('btnPlay').disabled = true;
       document.getElementById('btnRestart').disabled = true;
-
+    
       isTextMasked = true;
       updateEyeBtnUI();
-
+    
       try {
         const res = await fetch(getRawUrl(`${folderName}/lesson.json`));
         if (!res.ok) throw new Error("讀取失敗");
         currentLesson = await res.json();
         currentLesson.folderName = folderName;
-
-        const downloadedVoices = Object.keys(currentLesson.voices || {}).filter(k => currentLesson.voices[k].downloaded);
-        if (!currentLesson.selectedVoice && downloadedVoices.length > 0) {
-          currentLesson.selectedVoice = downloadedVoices[0];
+    
+        // 動態比對 config.js：找出當前課文「已下載」且「存在於 config.js」的語音
+        const configuredVoices = APP_CONFIG.TTS_VOICES || [];
+        const downloadedVoices = configuredVoices.filter(v => 
+          currentLesson.voices && currentLesson.voices[v.id] && currentLesson.voices[v.id].downloaded
+        );
+    
+        if (downloadedVoices.length > 0) {
+          // 若當前記錄的 selectedVoice 無效或未被下載，自動採用 config.js 中優先序最高的第一個已下載語音
+          const isValid = downloadedVoices.some(v => v.id === currentLesson.selectedVoice);
+          if (!isValid) {
+            currentLesson.selectedVoice = downloadedVoices[0].id;
+          }
+        } else {
+          // 課文尚未下載任何語音，保持為空，絕不預設任何特定模型
+          currentLesson.selectedVoice = "";
         }
-
+    
         renderCatalogDropdown();
         renderChunks();
         updateVoiceBadge();
         updateNavButtonsState();
-
+    
         document.getElementById('globalLoadingCard').style.display = 'none';
-
+    
         await reloadAudioForCurrentLesson();
-
+    
       } catch (err) {
         document.getElementById('globalLoadingCard').style.display = 'none';
         banner.innerText = "❌ 載入失敗: " + err.message;
@@ -1052,23 +1064,37 @@
 
     async function reloadAudioForCurrentLesson() {
       if (!currentLesson) return;
-      const myTaskId = ++audioLoadTaskId;
       const banner = document.getElementById('playerBanner');
-      banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔...`;
-
+      const btnPlay = document.getElementById('btnPlay');
+      const btnRestart = document.getElementById('btnRestart');
+      const btnReplay = document.getElementById('btnReplay');
+    
+      // 清除舊 Blob 快取
       Object.values(audioBlobUrls).forEach(u => URL.revokeObjectURL(u));
       audioBlobUrls = {};
-
-      const voiceName = currentLesson.selectedVoice || 'en-HK-YanNeural';
+    
+      // 若當前課文未選擇/未下載語音，直接提示並鎖定按鈕，絕不發起任何請求
+      if (!currentLesson.selectedVoice) {
+        banner.innerText = `⚠️ 尚未下載語音，請至課文管理下載`;
+        btnPlay.disabled = true;
+        btnRestart.disabled = true;
+        btnReplay.disabled = true;
+        return;
+      }
+    
+      const myTaskId = ++audioLoadTaskId;
+      banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔...`;
+    
+      const voiceName = currentLesson.selectedVoice;
       const folderName = currentLesson.folderName;
       let loaded = 0;
       const total = currentLesson.chunks.length;
-
+    
       await Promise.all(currentLesson.chunks.map(async (chunk) => {
         let blobUrl = null;
         const fileName = getDriveMp3Name(chunk.index, chunk.text);
         const audioPath = `${folderName}/${voiceName}/${fileName}`;
-
+    
         try {
           const r = await fetch(getCdnUrl(audioPath));
           if (r.ok) {
@@ -1076,31 +1102,38 @@
             blobUrl = URL.createObjectURL(b);
           }
         } catch (e) {}
-
+    
+        // 僅在已下載該語音、但 CDN 尚未更新時才走 fallback
         if (!blobUrl) {
-          const fb = await callGAS('fallbackGetAudio', {
-            payload: {
-              folderName: folderName,
-              voiceName: voiceName,
-              chunk: chunk
-            }
-          });
-          blobUrl = fb.audioData;
+          try {
+            const fb = await callGAS('fallbackGetAudio', {
+              payload: {
+                folderName: folderName,
+                voiceName: voiceName,
+                chunk: chunk
+              }
+            });
+            blobUrl = fb.audioData;
+          } catch (err) {
+            console.warn(`第 ${chunk.index} 句載入失敗`, err);
+          }
         }
-
+    
         if (myTaskId !== audioLoadTaskId) return;
-
-        audioBlobUrls[chunk.index] = blobUrl;
+    
+        if (blobUrl) {
+          audioBlobUrls[chunk.index] = blobUrl;
+        }
         loaded++;
         banner.innerHTML = `<span class="loading-hourglass">⏳</span> 載入音檔 ${loaded}/${total}...`;
       }));
-
+    
       if (myTaskId !== audioLoadTaskId) return;
-
+    
       banner.innerText = `✅ 已就緒`;
-      document.getElementById('btnPlay').disabled = false;
-      document.getElementById('btnRestart').disabled = false;
-      document.getElementById('btnReplay').disabled = false;
+      btnPlay.disabled = false;
+      btnRestart.disabled = false;
+      btnReplay.disabled = false;
       updateNavButtonsState();
     }
 
